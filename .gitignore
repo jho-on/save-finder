@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Ferramentas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Ambiente
+.env
+.env.*
+!.env.example
+
+# Notas locais: cronograma, progresso, rascunhos
+*.local.md
+
+# Dados locais: banco, thumbnails, temporários, cookies
+data/
+cookies.txt
+*.session
+session.json
+
+# Modelos e caches locais
+models/
+.cache/
+*.log
+logs/
+
+# Editores e SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
