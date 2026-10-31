@@ -28,6 +28,9 @@ def test_default_settings_resolve_paths(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.providers.asr.name == "faster-whisper"
     assert settings.providers.vision.options["model"] == "ViT-B-32"
     assert settings.pipeline.download_timeout == 180
+    assert settings.pipeline.max_retries == 2
+    assert settings.pipeline.retry_backoff_seconds == 1.0
+    assert settings.pipeline.request_jitter_seconds == 0.5
     assert settings.import_config.max_archive_mb == 200
     assert settings.import_config.max_uncompressed_mb == 256
     assert settings.import_config.max_files == 200
@@ -41,6 +44,8 @@ def test_environment_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
     settings = load_settings()
     assert settings.paths.data == data
+    assert settings.paths.thumbs == data / "thumbs"
+    assert settings.paths.tmp == data / "tmp"
     assert settings.database.url == f"sqlite:///{tmp_path / 'custom.db'}"
 
 
