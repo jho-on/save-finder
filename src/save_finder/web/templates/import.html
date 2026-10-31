@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Importar — {{ app_name }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="intro">
+        <p class="eyebrow">{{ app_name }}</p>
+        <h1>Importar salvos do Instagram</h1>
+        <p class="lede">
+          Arraste o ZIP da exportação oficial. O arquivo é processado localmente,
+          só os JSON de salvos são lidos e tudo é removido ao final.
+        </p>
+      </header>
+
+      <section
+        id="dropzone"
+        class="dropzone"
+        role="button"
+        tabindex="0"
+        aria-label="Selecionar ou arrastar o arquivo ZIP da exportação"
+      >
+        <input id="file" type="file" accept=".zip,application/zip" hidden>
+        <span class="drop-icon" aria-hidden="true">↓</span>
+        <p><strong>Arraste o ZIP aqui</strong> ou clique para escolher</p>
+        <p class="hint">Aceita o arquivo como veio do Instagram, sem descompactar.</p>
+      </section>
+
+      <p id="file-name" class="file-name" aria-live="polite"></p>
+
+      <button id="submit" type="submit" disabled>Importar</button>
+
+      <section id="feedback" class="feedback" aria-live="polite"></section>
+
+      <footer class="foot">
+        <span>Limite de {{ max_upload_mb }} MB por arquivo.</span>
+        <span>v{{ version }}</span>
+      </footer>
+    </main>
+
+    <script src="/static/import.js"></script>
+  </body>
+</html>
