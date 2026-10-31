@@ -17,6 +17,7 @@ from save_finder import __version__
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, ensure_directories, load_settings
 from save_finder.db import make_engine, make_session_factory, session_scope, upgrade_database
+from save_finder.download import download_item
 from save_finder.enrich import enrich_items
 from save_finder.errors import ConfigError, SaveFinderError
 from save_finder.importer import import_export
@@ -201,6 +202,49 @@ def enrich_command(
 
     summary = ", ".join(f"{status}: {count}" for status, count in sorted(report.counts.items()))
     console.print(f"Enriched {report.total} item(s) — {summary}")
+
+
+@app.command("download")
+def download_command(
+    limit: Annotated[int, typer.Option(help="Maximum items to download.")] = 3,
+    platform: Annotated[
+        str | None, typer.Option(help="Only download items from this platform.")
+    ] = None,
+) -> None:
+    """Download media pieces for enriched items (Fase 3)."""
+    settings = _settings()
+    ensure_directories(settings)
+    try:
+        with _session_scope(settings) as session:
+            from sqlalchemy import select
+
+            from save_finder.models import Item
+
+            items = session.scalars(
+                select(Item).where(Item.status == "enriched").limit(limit)
+            ).all()
+            results = []
+            for item in items:
+                res = download_item(
+                    item, session, settings, timeout=settings.pipeline.download_timeout
+                )
+                results.append((item.external_id, res.pieces, res.cleaned, res.error))
+            table = Table(title="Download (Fase 3)")
+            table.add_column("Item")
+            table.add_column("Pieces")
+            table.add_column("Clean")
+            table.add_column("Error")
+            for ext, pieces, cleaned, err in results:
+                table.add_row(
+                    ext,
+                    str(len(pieces)),
+                    "yes" if cleaned else "no",
+                    err or "",
+                )
+            console.print(table)
+    except SaveFinderError as exc:
+        console.print(f"[red]Download error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("stats")
