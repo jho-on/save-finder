@@ -14,6 +14,7 @@ from rich.table import Table
 from sqlalchemy.orm import Session
 
 from save_finder import __version__
+from save_finder.classify.fuse import classify_item
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, ensure_directories, load_settings
 from save_finder.db import make_engine, make_session_factory, session_scope, upgrade_database
@@ -244,6 +245,60 @@ def download_command(
             console.print(table)
     except SaveFinderError as exc:
         console.print(f"[red]Download error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("classify")
+def classify_command(
+    limit: Annotated[int, typer.Option(help="Maximum items to classify.")] = 30,
+    platform: Annotated[
+        str | None, typer.Option(help="Only classify items from this platform.")
+    ] = None,
+) -> None:
+    """Classify enriched items with taxonomy tags (Fase 4)."""
+    settings = _settings()
+    ensure_directories(settings)
+    try:
+        taxonomy = Taxonomy.load(settings.taxonomy_path)
+        with _session_scope(settings) as session:
+            from sqlalchemy import select
+
+            from save_finder.models import Item
+
+            query = select(Item).where(Item.status == "enriched").limit(limit)
+            if platform is not None:
+                query = query.where(Item.platform == platform)
+            items = session.scalars(query).all()
+            table = Table(title="Classification (Fase 4)")
+            table.add_column("Item")
+            table.add_column("Tags")
+            table.add_column("Evidence")
+            table.add_column("Error")
+            total_tags = 0
+            for item in items:
+                result = classify_item(item, taxonomy)
+                if result.tags:
+                    from save_finder.repositories.tags import add_item_tags
+
+                    add_item_tags(
+                        session,
+                        item.id,
+                        result.tags,
+                        confidences=result.confidences,
+                        source="auto",
+                    )
+                    session.commit()
+                    total_tags += len(result.tags)
+                table.add_row(
+                    item.external_id,
+                    ", ".join(result.tags) or "—",
+                    result.evidence or "—",
+                    result.error or "",
+                )
+            console.print(table)
+            console.print(f"Classified {len(items)} item(s) — {total_tags} tag(s) emitted")
+    except SaveFinderError as exc:
+        console.print(f"[red]Classification error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
 
