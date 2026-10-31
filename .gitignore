@@ -28,6 +28,7 @@ data/
 cookies.txt
 *.session
 session.json
+*.zip
 
 # Modelos e caches locais
 models/

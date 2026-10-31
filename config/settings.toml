@@ -1,0 +1,49 @@
+# SaveFinder runtime configuration.
+# Relative paths are resolved from the repository root.
+# Environment variables listed in .env.example override the values below.
+
+[app]
+name = "SaveFinder"
+
+[database]
+# SQLite by default; point to a Postgres URL when the need arises.
+url = "sqlite:///data/save-finder.db"
+
+[paths]
+data = "data"
+thumbs = "data/thumbs"
+tmp = "data/tmp"
+
+[taxonomy]
+path = "config/taxonomy.yaml"
+
+[pipeline]
+# Seconds allowed per stage.
+download_timeout = 180
+analyze_timeout = 300
+# Maximum simultaneous downloads; keep low to avoid rate limits.
+max_concurrency = 3
+# Abort a batch when free disk space drops below this margin.
+min_free_disk_gb = 2.0
+
+[import]
+# Limits for the official export ZIP. Only JSON files under "saved" are read.
+max_archive_mb = 200
+max_uncompressed_mb = 256
+max_files = 200
+
+[providers.asr]
+name = "faster-whisper"
+model = "small"
+
+[providers.vision]
+name = "open-clip"
+model = "ViT-B-32"
+
+[providers.llm]
+name = "ollama"
+model = "llama3.1"
+
+[web]
+host = "127.0.0.1"
+port = 8000
