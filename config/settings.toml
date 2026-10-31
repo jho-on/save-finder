@@ -25,6 +25,11 @@ analyze_timeout = 300
 max_concurrency = 3
 # Abort a batch when free disk space drops below this margin.
 min_free_disk_gb = 2.0
+# Retries only apply to transient network failures, with exponential backoff.
+max_retries = 2
+retry_backoff_seconds = 1.0
+# Random pause before each request to avoid bursts.
+request_jitter_seconds = 0.5
 
 [import]
 # Limits for the official export ZIP. Only JSON files under "saved" are read.

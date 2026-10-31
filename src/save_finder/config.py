@@ -36,6 +36,9 @@ class PipelineConfig:
     analyze_timeout: int = 300
     max_concurrency: int = 3
     min_free_disk_gb: float = 2.0
+    max_retries: int = 2
+    retry_backoff_seconds: float = 1.0
+    request_jitter_seconds: float = 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,9 +154,15 @@ def load_settings(config_path: Path | str | None = None) -> Settings:
     web = _section(raw, "web")
     providers_raw = _section(raw, "providers")
 
-    data_dir = os.environ.get("SAVE_FINDER_DATA_DIR", str(paths.get("data", "data")))
-    thumbs = paths.get("thumbs", Path(data_dir) / "thumbs")
-    tmp = paths.get("tmp", Path(data_dir) / "tmp")
+    data_override = os.environ.get("SAVE_FINDER_DATA_DIR")
+    if data_override:
+        data_dir = data_override
+        thumbs = Path(data_dir) / "thumbs"
+        tmp = Path(data_dir) / "tmp"
+    else:
+        data_dir = str(paths.get("data", "data"))
+        thumbs = paths.get("thumbs", Path(data_dir) / "thumbs")
+        tmp = paths.get("tmp", Path(data_dir) / "tmp")
 
     database_url = os.environ.get(
         "SAVE_FINDER_DB_URL",
@@ -170,6 +179,9 @@ def load_settings(config_path: Path | str | None = None) -> Settings:
             analyze_timeout=int(pipeline.get("analyze_timeout", 300)),
             max_concurrency=int(pipeline.get("max_concurrency", 3)),
             min_free_disk_gb=float(pipeline.get("min_free_disk_gb", 2.0)),
+            max_retries=int(pipeline.get("max_retries", 2)),
+            retry_backoff_seconds=float(pipeline.get("retry_backoff_seconds", 1.0)),
+            request_jitter_seconds=float(pipeline.get("request_jitter_seconds", 0.5)),
         )
         web_config = WebConfig(
             host=str(web.get("host", "127.0.0.1")),

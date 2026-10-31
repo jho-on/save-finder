@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
-from save_finder.models import Item, ItemStatus, PlatformSource, Tag, utc_now_iso
-from save_finder.platforms.base import SavedItem
+from save_finder.models import Item, ItemStatus, PlatformSource, PostType, Tag, utc_now_iso
+from save_finder.platforms.base import Metadata, SavedItem
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +105,63 @@ def get_item(session: Session, platform: str, external_id: str) -> Item | None:
             Item.external_id == external_id,
         )
     )
+
+
+def list_pending_items(
+    session: Session,
+    *,
+    limit: int = 50,
+    platform: str | None = None,
+    include_errors: bool = False,
+) -> Sequence[Item]:
+    """Return pending items in insertion order for a resumable batch."""
+    statuses = (ItemStatus.PENDING, ItemStatus.ERROR) if include_errors else (ItemStatus.PENDING,)
+    statement = select(Item).where(Item.status.in_(statuses))
+    if platform is not None:
+        statement = statement.where(Item.platform == platform)
+    if include_errors:
+        statement = statement.order_by(case((Item.status == ItemStatus.ERROR, 0), else_=1), Item.id)
+    else:
+        statement = statement.order_by(Item.id)
+    statement = statement.limit(limit)
+    return session.scalars(statement).all()
+
+
+def save_enrichment(
+    session: Session,
+    item: Item,
+    metadata: Metadata,
+    *,
+    thumb_path: str | None,
+) -> None:
+    """Persist public metadata and the local thumbnail reference."""
+    if metadata.author:
+        item.author = metadata.author
+    item.caption = metadata.caption
+    item.post_type = PostType(metadata.post_type) if metadata.post_type else None
+    item.media_count = metadata.media_count
+    item.duration_seconds = metadata.duration_seconds
+    if thumb_path:
+        item.thumb_path = thumb_path
+    item.status = ItemStatus.ENRICHED if metadata.media_count > 0 else ItemStatus.SKIPPED
+    item.error = None
+    item.enriched_at = utc_now_iso()
+    item.updated_at = item.enriched_at
+    session.flush()
+
+
+def mark_item_status(
+    session: Session,
+    item: Item,
+    status: ItemStatus,
+    *,
+    error: str | None = None,
+) -> None:
+    """Record a terminal enrichment outcome."""
+    item.status = status
+    item.error = error
+    item.updated_at = utc_now_iso()
+    session.flush()
 
 
 def list_items(
