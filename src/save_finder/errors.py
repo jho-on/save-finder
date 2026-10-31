@@ -44,6 +44,14 @@ class EnrichError(SaveFinderError):
     """Metadata or thumbnail could not be obtained."""
 
 
+class EnrichUnavailable(EnrichError):
+    """The post was deleted, made private or blocked in this region."""
+
+
+class EnrichTransient(EnrichError):
+    """A network or rate-limit failure that may succeed on retry."""
+
+
 class DownloadError(SaveFinderError):
     """Media could not be downloaded."""
 

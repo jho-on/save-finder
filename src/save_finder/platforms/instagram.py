@@ -18,7 +18,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from save_finder.errors import ExportImportError, UnsupportedURL
-from save_finder.platforms.base import SavedItem
+from save_finder.platforms.base import SavedItem, YtDlpAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ POST_PATH = re.compile(r"^/(?:[A-Za-z0-9_.]+/)?(p|reel|reels|tv)/([A-Za-z0-9_-]+
 NAME_TOKENS = ("name", "nome", "nombre", "nom", "naam")
 
 
-class InstagramAdapter:
+class InstagramAdapter(YtDlpAdapter):
     slug = "instagram"
 
     def __init__(self) -> None:
