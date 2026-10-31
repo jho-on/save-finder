@@ -2,11 +2,68 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.models import Tag, TagLevel, utc_now_iso
+
+
+def add_item_tags(
+    session: Session,
+    item_id: int,
+    tag_slugs: Sequence[str],
+    *,
+    confidences: Sequence[float] | None = None,
+    source: str = "auto",
+) -> int:
+    """Persist taxonomy tags for one item, preserving parent rules.
+
+    Only tags present in the taxonomy are inserted; duplicates for the same
+    item are ignored (upsert by ``(item_id, tag_slug)``).
+    """
+    from save_finder.classify.taxonomy import Taxonomy
+    from save_finder.config import load_settings
+    from save_finder.models import ItemTag, Tag, TagSource
+
+    taxonomy = Taxonomy.load(load_settings().taxonomy_path)
+    valid_slugs = {t.slug for t in (*taxonomy.broad, *taxonomy.specific)}
+    tag_ids = {
+        slug: session.scalar(select(Tag.id).where(Tag.slug == slug))
+        for slug in set(tag_slugs)
+        if slug in valid_slugs
+    }
+    inserted = 0
+    for idx, slug in enumerate(tag_slugs):
+        if slug not in valid_slugs:
+            continue
+        tag_id = tag_ids.get(slug)
+        if tag_id is None:
+            continue
+        existing = session.scalar(
+            select(ItemTag).where(ItemTag.item_id == item_id, ItemTag.tag_id == tag_id)
+        )
+        if existing is not None:
+            if existing.source == TagSource.MANUAL:
+                continue
+            existing.confidence = confidences[idx] if confidences else existing.confidence
+            existing.source = TagSource(source)
+            session.flush()
+            inserted += 1
+            continue
+        session.add(
+            ItemTag(
+                item_id=item_id,
+                tag_id=tag_id,
+                confidence=confidences[idx] if confidences else 0.6,
+                source=TagSource(source),
+            )
+        )
+        inserted += 1
+    session.flush()
+    return inserted
 
 
 def sync_taxonomy(session: Session, taxonomy: Taxonomy) -> tuple[int, int]:
