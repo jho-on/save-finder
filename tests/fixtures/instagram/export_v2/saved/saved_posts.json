@@ -1,0 +1,112 @@
+[
+  {
+    "timestamp": 1729900000,
+    "media": [],
+    "label_values": [
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/reel/V2AAA/?igsh=tracking",
+        "href": "https://www.instagram.com/reel/V2AAA/?igsh=tracking"
+      },
+      {
+        "label": "Legenda",
+        "value": "uma legenda com emoji \ud83d\udd25 e acentua\u00e7\u00e3o"
+      },
+      {
+        "label": "T\u00edtulo",
+        "value": ""
+      },
+      {
+        "title": "Hashtags",
+        "dict": [
+          {
+            "title": "",
+            "dict": [
+              {
+                "label": "Nome",
+                "value": "pessoal"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Dono",
+        "dict": [
+          {
+            "title": "",
+            "dict": [
+              {
+                "label": "Nome de usu\u00e1rio",
+                "value": "alice"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Parceiro de marca",
+        "dict": []
+      }
+    ],
+    "fbid": "1001"
+  },
+  {
+    "timestamp": 1729900100,
+    "media": [],
+    "label_values": [
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/p/V2BBB/",
+        "href": "https://www.instagram.com/p/V2BBB/"
+      },
+      {
+        "label": "Legenda",
+        "value": ""
+      },
+      {
+        "label": "T\u00edtulo",
+        "value": ""
+      },
+      {
+        "title": "Dono",
+        "dict": [
+          {
+            "title": "",
+            "dict": [
+              {
+                "label": "Nome de usu\u00e1rio",
+                "value": "bob"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "fbid": "1002"
+  },
+  {
+    "timestamp": 1729900200,
+    "media": [],
+    "label_values": [
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/reel/V2AAA/",
+        "href": "https://www.instagram.com/reel/V2AAA/"
+      }
+    ],
+    "fbid": "1003"
+  },
+  {
+    "timestamp": 1729900300,
+    "media": [],
+    "label_values": [
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/stories/someone/123/",
+        "href": "https://www.instagram.com/stories/someone/123/"
+      }
+    ],
+    "fbid": "1004"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "saved_saved_media": [
+    {
+      "title": "alice",
+      "string_map_data": {
+        "Saved on": {
+          "href": "https://www.instagram.com/p/AAA111/?igsh=tracking123",
+          "timestamp": 1690000000
+        }
+      }
+    },
+    {
+      "title": "bob",
+      "string_map_data": {
+        "Saved on": {
+          "href": "https://www.instagram.com/reel/BBB222/",
+          "timestamp": 1690000100
+        }
+      }
+    },
+    {
+      "title": "carol",
+      "string_map_data": {
+        "Saved on": {
+          "href": "https://www.instagram.com/stories/carol/123456/",
+          "timestamp": 1690000200
+        }
+      }
+    }
+  ]
+}

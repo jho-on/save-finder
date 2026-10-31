@@ -1,0 +1,24 @@
+[
+  {
+    "timestamp": 1729800000,
+    "media": [],
+    "label_values": [
+      {
+        "label": "Nome",
+        "value": "Receitas"
+      }
+    ],
+    "fbid": "2001"
+  },
+  {
+    "timestamp": 1729800100,
+    "media": [],
+    "label_values": [
+      {
+        "label": "Nome",
+        "value": "Viagens"
+      }
+    ],
+    "fbid": "2002"
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "saved_collections": [
+    {
+      "string_map_data": {
+        "Nome da coleção": {
+          "value": "Receitas"
+        }
+      },
+      "media": [
+        {
+          "title": "dave",
+          "string_map_data": {
+            "Salvo em": {
+              "href": "https://www.instagram.com/p/CCC333/",
+              "timestamp": 1690000300
+            }
+          }
+        },
+        {
+          "title": "alice",
+          "string_map_data": {
+            "Salvo em": {
+              "href": "https://www.instagram.com/p/AAA111/",
+              "timestamp": 1690000000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "string_map_data": {
+        "Collection name": {
+          "value": "Viagens"
+        }
+      },
+      "media": [
+        {
+          "title": "erin",
+          "string_map_data": {
+            "Guardado el": {
+              "href": "https://www.instagram.com/tv/DDD444/",
+              "timestamp": 1690000400
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
