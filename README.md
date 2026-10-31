@@ -75,6 +75,9 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 
 # download das peças, áudio, keyframe e thumbnail definitiva
 .venv/bin/save-finder download --limit 3
+
+# classificação automática pelas tags da taxonomia
+.venv/bin/save-finder classify --limit 30
 ```
 
 # contagens por status e plataforma
