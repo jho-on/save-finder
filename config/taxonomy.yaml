@@ -1,0 +1,284 @@
+version: 1
+tags:
+- slug: comida-e-bebida
+  name: Comida e bebida
+  visual_description: food, cooking, restaurant dishes, drinks, desserts
+- slug: viagem-e-lugares
+  name: Viagem e lugares
+  visual_description: travel destinations, landscapes, hotels, city views, tours
+- slug: tecnologia
+  name: Tecnologia
+  visual_description: computers, phones, gadgets, code on screens, AI, software
+- slug: ciencia-e-educacao
+  name: Ciência e educação
+  visual_description: classroom, books, diagrams, experiments, explainers
+- slug: saude-e-fitness
+  name: Saúde e fitness
+  visual_description: gym workout, running, yoga, exercise, medical care
+- slug: beleza-e-cuidados
+  name: Beleza e cuidados
+  visual_description: makeup application, skincare, hair styling, nails
+- slug: moda-e-estilo
+  name: Moda e estilo
+  visual_description: fashion outfits, clothing, accessories, fashion shoot
+- slug: casa-e-decoracao
+  name: Casa e decoração
+  visual_description: interior design, furniture, home decor, plants indoors
+- slug: dinheiro-e-negocios
+  name: Dinheiro e negócios
+  visual_description: money, charts, business meeting, investing, storefront
+- slug: trabalho-e-carreira
+  name: Trabalho e carreira
+  visual_description: office desk, job interview, resume, teamwork, presentation
+- slug: arte-e-design
+  name: Arte e design
+  visual_description: drawing, painting, graphic design, craft, photography
+- slug: musica-e-audio
+  name: Música e áudio
+  visual_description: musical instruments, concert stage, dancing, studio recording
+- slug: humor-e-memes
+  name: Humor e memes
+  visual_description: comedy sketch, funny reaction, meme text, prank
+- slug: esportes
+  name: Esportes
+  visual_description: sports match, athletes, ball games, combat sports, racing
+- slug: games
+  name: Games
+  visual_description: video game footage, game characters, esports, consoles
+- slug: noticias-e-politica
+  name: Notícias e política
+  visual_description: news broadcast, press conference, protests, government
+- slug: entretenimento
+  name: Entretenimento
+  visual_description: movie scenes, celebrities, TV shows, anime, trailers
+- slug: animais
+  name: Animais
+  visual_description: pets, dogs, cats, wildlife, farm animals
+- slug: automotivo
+  name: Automotivo
+  visual_description: cars, motorcycles, engines, car repair, driving
+- slug: bem-estar-e-espiritualidade
+  name: Bem-estar e espiritualidade
+  visual_description: meditation, astrology, religious practice, self-care routine
+- slug: receitas
+  name: Receitas
+  parent: comida-e-bebida
+- slug: restaurantes
+  name: Restaurantes
+  parent: comida-e-bebida
+- slug: doces-e-sobremesas
+  name: Doces e sobremesas
+  parent: comida-e-bebida
+- slug: drinks
+  name: Drinks
+  parent: comida-e-bebida
+- slug: destinos
+  name: Destinos
+  parent: viagem-e-lugares
+- slug: dicas-de-viagem
+  name: Dicas de viagem
+  parent: viagem-e-lugares
+- slug: hospedagem
+  name: Hospedagem
+  parent: viagem-e-lugares
+- slug: gadgets
+  name: Gadgets
+  parent: tecnologia
+- slug: programacao
+  name: Programação
+  parent: tecnologia
+- slug: ia
+  name: IA
+  parent: tecnologia
+- slug: apps-e-produtividade
+  name: Apps e produtividade
+  parent: tecnologia
+- slug: seguranca-digital
+  name: Segurança digital
+  parent: tecnologia
+- slug: curiosidades
+  name: Curiosidades
+  parent: ciencia-e-educacao
+- slug: historia
+  name: História
+  parent: ciencia-e-educacao
+- slug: idiomas
+  name: Idiomas
+  parent: ciencia-e-educacao
+- slug: musculacao
+  name: Musculação
+  parent: saude-e-fitness
+- slug: corrida
+  name: Corrida
+  parent: saude-e-fitness
+- slug: yoga-e-mobilidade
+  name: Yoga e mobilidade
+  parent: saude-e-fitness
+- slug: saude-mental
+  name: Saúde mental
+  parent: saude-e-fitness
+- slug: nutricao
+  name: Nutrição
+  parent: saude-e-fitness
+- slug: maquiagem
+  name: Maquiagem
+  parent: beleza-e-cuidados
+- slug: skincare
+  name: Skincare
+  parent: beleza-e-cuidados
+- slug: cabelo
+  name: Cabelo
+  parent: beleza-e-cuidados
+- slug: unhas
+  name: Unhas
+  parent: beleza-e-cuidados
+- slug: looks
+  name: Looks
+  parent: moda-e-estilo
+- slug: acessorios
+  name: Acessórios
+  parent: moda-e-estilo
+- slug: compras
+  name: Compras
+  parent: moda-e-estilo
+- slug: organizacao
+  name: Organização
+  parent: casa-e-decoracao
+- slug: reforma
+  name: Reforma
+  parent: casa-e-decoracao
+- slug: plantas
+  name: Plantas
+  parent: casa-e-decoracao
+- slug: limpeza
+  name: Limpeza
+  parent: casa-e-decoracao
+- slug: investimentos
+  name: Investimentos
+  parent: dinheiro-e-negocios
+- slug: empreendedorismo
+  name: Empreendedorismo
+  parent: dinheiro-e-negocios
+- slug: economia-domestica
+  name: Economia doméstica
+  parent: dinheiro-e-negocios
+- slug: marketing
+  name: Marketing
+  parent: dinheiro-e-negocios
+- slug: produtividade
+  name: Produtividade
+  parent: trabalho-e-carreira
+- slug: entrevistas
+  name: Entrevistas
+  parent: trabalho-e-carreira
+- slug: curriculo
+  name: Currículo
+  parent: trabalho-e-carreira
+- slug: lideranca
+  name: Liderança
+  parent: trabalho-e-carreira
+- slug: ilustracao
+  name: Ilustração
+  parent: arte-e-design
+- slug: fotografia
+  name: Fotografia
+  parent: arte-e-design
+- slug: design-grafico
+  name: Design gráfico
+  parent: arte-e-design
+- slug: artesanato
+  name: Artesanato
+  parent: arte-e-design
+- slug: arquitetura
+  name: Arquitetura
+  parent: arte-e-design
+- slug: instrumentos
+  name: Instrumentos
+  parent: musica-e-audio
+- slug: producao-musical
+  name: Produção musical
+  parent: musica-e-audio
+- slug: dancas
+  name: Danças
+  parent: musica-e-audio
+- slug: musica-ao-vivo
+  name: Música ao vivo
+  parent: musica-e-audio
+- slug: memes
+  name: Memes
+  parent: humor-e-memes
+- slug: esquetes
+  name: Esquetes
+  parent: humor-e-memes
+- slug: stand-up
+  name: Stand-up
+  parent: humor-e-memes
+- slug: pegadinhas
+  name: Pegadinhas
+  parent: humor-e-memes
+- slug: futebol
+  name: Futebol
+  parent: esportes
+- slug: luta
+  name: Luta
+  parent: esportes
+- slug: basquete
+  name: Basquete
+  parent: esportes
+- slug: esportes-radicais
+  name: Esportes radicais
+  parent: esportes
+- slug: jogos-eletronicos
+  name: Jogos eletrônicos
+  parent: games
+- slug: e-sports
+  name: E-sports
+  parent: games
+- slug: retrogames
+  name: Retrogames
+  parent: games
+- slug: noticias
+  name: Notícias
+  parent: noticias-e-politica
+- slug: politica
+  name: Política
+  parent: noticias-e-politica
+- slug: filmes-e-series
+  name: Filmes e séries
+  parent: entretenimento
+- slug: celebridades
+  name: Celebridades
+  parent: entretenimento
+- slug: reality-shows
+  name: Reality shows
+  parent: entretenimento
+- slug: anime
+  name: Anime
+  parent: entretenimento
+- slug: pets
+  name: Pets
+  parent: animais
+- slug: animais-selvagens
+  name: Animais selvagens
+  parent: animais
+- slug: carros
+  name: Carros
+  parent: automotivo
+- slug: motos
+  name: Motos
+  parent: automotivo
+- slug: mecanica
+  name: Mecânica
+  parent: automotivo
+- slug: meditacao
+  name: Meditação
+  parent: bem-estar-e-espiritualidade
+- slug: astrologia
+  name: Astrologia
+  parent: bem-estar-e-espiritualidade
+- slug: espiritualidade
+  name: Espiritualidade
+  parent: bem-estar-e-espiritualidade
+- slug: autocuidado
+  name: Autocuidado
+  parent: bem-estar-e-espiritualidade
