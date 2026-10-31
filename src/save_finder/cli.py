@@ -17,6 +17,7 @@ from save_finder import __version__
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, ensure_directories, load_settings
 from save_finder.db import make_engine, make_session_factory, session_scope, upgrade_database
+from save_finder.enrich import enrich_items
 from save_finder.errors import ConfigError, SaveFinderError
 from save_finder.importer import import_export
 from save_finder.platforms.registry import get_adapter
@@ -139,6 +140,67 @@ def import_export_command(
     if result.unreadable:
         table.add_row("Unreadable files", str(result.unreadable))
     console.print(table)
+
+
+@app.command("enrich")
+def enrich_command(
+    limit: Annotated[int, typer.Option(help="Maximum items to enrich.")] = 30,
+    platform: Annotated[
+        str | None, typer.Option(help="Only enrich items from this platform.")
+    ] = None,
+    retry_errors: Annotated[
+        bool, typer.Option("--retry-errors", help="Also retry items left in error.")
+    ] = False,
+) -> None:
+    """Fetch public metadata and thumbnails for pending items."""
+    settings = _settings()
+    ensure_directories(settings)
+    if platform is not None:
+        try:
+            get_adapter(platform)
+        except SaveFinderError as exc:
+            console.print(f"[red]Platform error:[/red] {exc}")
+            raise typer.Exit(code=1) from exc
+
+    try:
+        with _session_scope(settings) as session:
+            report = enrich_items(
+                session,
+                settings,
+                limit=limit,
+                platform=platform,
+                retry_errors=retry_errors,
+            )
+    except SaveFinderError as exc:
+        console.print(f"[red]Enrichment error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if not report.total:
+        console.print("No pending items to enrich.")
+        return
+
+    table = Table(title="Enrichment")
+    table.add_column("Item")
+    table.add_column("Status")
+    table.add_column("Type")
+    table.add_column("Pieces", justify="right")
+    table.add_column("Thumb")
+    table.add_column("ms", justify="right")
+    table.add_column("Error", overflow="fold")
+    for outcome in report.outcomes:
+        table.add_row(
+            outcome.external_id,
+            outcome.status,
+            outcome.post_type or "—",
+            str(outcome.media_count),
+            "yes" if outcome.thumbnail_saved else "no",
+            str(outcome.elapsed_ms),
+            outcome.error or "",
+        )
+    console.print(table)
+
+    summary = ", ".join(f"{status}: {count}" for status, count in sorted(report.counts.items()))
+    console.print(f"Enriched {report.total} item(s) — {summary}")
 
 
 @app.command("stats")
