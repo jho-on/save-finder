@@ -115,6 +115,10 @@ Aceite: duas execuções sobre o mesmo export resultam em zero itens novos na se
 
 Obter metadados públicos do item (autor, caption, tipo do post, quantidade de peças, duração) e baixar a thumbnail para armazenamento local. Nunca guardar URL de CDN, que expira. O tipo detectado aqui define o caminho da análise adiante: vídeo, imagem ou carrossel. Falhas viram status explícito. Retentativas só para erro de rede, com limite e espera crescente.
 
+O adaptador padrão usa `yt-dlp` apenas para leitura pública. O núcleo baixa a thumbnail para `data/thumbs/` e grava o caminho local; a URL remota existe só em memória. O caminho é relativo ao diretório de dados, para o banco continuar portátil. Metadados e thumbnail são etapas separadas: se a thumbnail falhar, o item ainda fica `enriched` e a UI usa placeholder.
+
+O lote processa apenas itens `pending`, com concorrência limitada e jitter entre requisições. Erros transitórios têm retentativa com backoff exponencial. Item privado, removido ou bloqueado vira `unavailable`; falha nossa vira `error` com a mensagem. Um item com problema não interrompe o lote, e cada resultado é gravado assim que fica pronto. Itens em `error` podem ser reprocessados explicitamente com `--retry-errors`.
+
 Aceite: amostra de 30 itens com caption e thumbnail local, cobrindo os três formatos de post; nenhuma URL remota persistida; falhas classificadas corretamente.
 
 ### 6.3 Download e análise

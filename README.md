@@ -67,6 +67,12 @@ vários arquivos:
 O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens.
 
 ```bash
+# busca metadados públicos e baixa a thumbnail dos itens pendentes
+.venv/bin/save-finder enrich --limit 30
+
+# tenta de novo somente os itens que ficaram com status `error`
+.venv/bin/save-finder enrich --retry-errors --limit 10
+
 # contagens por status e plataforma
 .venv/bin/save-finder stats
 
@@ -74,9 +80,14 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 .venv/bin/save-finder taxonomy validate
 ```
 
+`enrich` grava autor, caption, tipo do post, número de peças, duração e o caminho local da
+thumbnail. A imagem de capa vai para `data/thumbs/`; nenhuma URL de CDN é persistida.
+Posts privados, removidos ou bloqueados ficam como `unavailable`; falhas nossas ficam como
+`error`. Reexecutar o comando pega apenas os itens ainda pendentes.
+
 A API expõe `GET /api/health` e `POST /api/import`; documentação interativa em `/docs`.
 
-Comandos previstos no plano (`enrich`, `analyze`, `classify`, `pipeline`) serão adicionados
+Comandos previstos no plano (`analyze`, `classify`, `pipeline`) serão adicionados
 conforme as fases avançarem.
 
 ### Export do Instagram
