@@ -65,6 +65,7 @@ export oficial → adapter → import → enrich → download temporário → an
 | D16 | Um embedding por item, agregando as mídias | Mantém o custo por item previsível; embedding por peça só quando a UI exibir carrossel |
 | D17 | MVP é web para computador | Evita construir autenticação e transporte antes do produto estar de pé |
 | D18 | Limiares com padrões iniciais, calibrados na Fase 4 | Permite codar antes da amostra rotulada existir, sem congelar números no chute |
+| D19 | Importação aceita o ZIP oficial e upload por arrastar na web | É o formato real da exportação; evita descompactação manual e mantém curtidas e comentários fora |
 
 A preparação para multi-dispositivo se limita a: API JSON separada da UI, camada de dados portável e providers desacoplados. Acesso remoto e autenticação de usuário único entram quando o uso em celular justificar; nada de workspace ou multi-tenancy.
 
@@ -106,7 +107,9 @@ A lista inicial, com os slugs e as descrições visuais, está em [`taxonomy.md`
 
 Ler a exportação oficial, normalizar links e identificar cada item pela chave `(plataforma, id externo)`. Preservar a coleção original como metadado, não como tag. A operação é idempotente: reimportar não duplica e só acrescenta o que é novo. O relatório deve separar novos, existentes e ignorados.
 
-Aceite: duas execuções sobre o mesmo export resultam em zero itens novos na segunda.
+A entrada é o ZIP exatamente como baixado da plataforma, uma pasta extraída ou um JSON isolado. O nome do arquivo não determina o conteúdo: o ZIP é reconhecido pela assinatura. Só os JSON abaixo do diretório `saved` são extraídos; curtidas, comentários e outros arquivos da exportação ficam de fora. A extração vai para `data/tmp/`, com limites de tamanho e quantidade, proteção contra path traversal e remoção garantida ao final, inclusive em erro. O mesmo fluxo atende a CLI e o upload por arrastar na página inicial da web; o arquivo enviado é apagado depois do processamento. Exportações que listam apenas nomes de coleções, sem vínculo com os posts, deixam `collection` vazio.
+
+Aceite: duas execuções sobre o mesmo export resultam em zero itens novos na segunda. Um ZIP com arquivos não relacionados importa apenas os salvos, e `data/tmp/` termina vazio mesmo quando o ZIP é inválido.
 
 ### 6.2 Enriquecimento
 
