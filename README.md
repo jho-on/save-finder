@@ -73,6 +73,10 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 # tenta de novo somente os itens que ficaram com status `error`
 .venv/bin/save-finder enrich --retry-errors --limit 10
 
+# download das peças, áudio, keyframe e thumbnail definitiva
+.venv/bin/save-finder download --limit 3
+```
+
 # contagens por status e plataforma
 .venv/bin/save-finder stats
 
