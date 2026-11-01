@@ -1,0 +1,162 @@
+<nav class="main-nav">
+	<a href="/" class="brand" aria-label="SaveFinder — Início">
+		<span class="brand-save">Save</span
+		><span class="brand-finder">Finder</span>
+	</a>
+
+	<a href="/library" id="nav-library" class="nav-link">Biblioteca</a>
+	<a href="/tags" id="nav-tags" class="nav-link">Tags</a>
+	<a href="/pipeline" id="nav-pipeline" class="nav-link">Painel</a>
+
+	<button
+		class="theme-toggle"
+		onclick="toggleTheme()"
+		aria-label="Alternar tema"
+		title="Alternar tema"
+	>
+		<svg
+			width="20"
+			height="20"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+		</svg>
+	</button>
+</nav>
+
+<style>
+	.main-nav {
+		position: sticky;
+		top: 0;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		width: 100%;
+		box-sizing: border-box;
+		padding: 0.75rem 1rem;
+		background: var(--surface);
+		border-bottom: 2px solid var(--brand-yellow);
+		font-family: system-ui, sans-serif;
+	}
+
+	.brand {
+		margin-right: 0.75rem;
+		color: var(--fg);
+		text-decoration: none;
+		font-size: 1.2rem;
+		font-weight: 800;
+		letter-spacing: -0.5px;
+	}
+
+	.brand-save {
+		color: var(--brand-pink);
+	}
+
+	.brand-finder {
+		color: var(--brand-yellow);
+	}
+
+	.brand:hover {
+		text-decoration: underline;
+		text-decoration-color: var(--brand-pink);
+		text-underline-offset: 4px;
+	}
+
+	.brand.active {
+		text-decoration: underline;
+		text-decoration-color: var(--brand-yellow);
+		text-underline-offset: 4px;
+	}
+
+	.nav-link {
+		display: inline-block;
+		position: static;
+		padding: 0.25rem 0.5rem;
+		border-bottom: 3px solid transparent;
+		border-radius: 4px;
+		color: var(--fg);
+		text-decoration: none;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.nav-link:hover {
+		color: var(--brand-pink);
+	}
+
+	.nav-link.active {
+		color: var(--brand-yellow);
+		border-bottom-color: var(--brand-yellow);
+	}
+
+	.theme-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 2.5rem;
+		height: 2.5rem;
+		margin-left: auto;
+		padding: 0;
+		border: 2px solid var(--brand-pink);
+		border-radius: 50%;
+		background: var(--fg);
+		color: var(--bg);
+		cursor: pointer;
+	}
+
+	.theme-toggle:hover {
+		border-color: var(--brand-yellow);
+	}
+
+	@media (max-width: 480px) {
+		.main-nav {
+			gap: 0.5rem;
+			padding: 0.65rem;
+		}
+
+		.brand {
+			width: 100%;
+			margin-right: 0;
+		}
+	}
+</style>
+
+<script>
+	(function () {
+		const path = window.location.pathname;
+
+		const map = {
+			"/library": "nav-library",
+			"/tags": "nav-tags",
+			"/pipeline": "nav-pipeline",
+			"/tag": "nav-tags",
+		};
+
+		if (path === "/") {
+			document.querySelector(".brand")?.classList.add("active");
+		}
+
+		for (const [route, id] of Object.entries(map)) {
+			if (path === route || path.startsWith(route + "/")) {
+				document.getElementById(id)?.classList.add("active");
+			}
+		}
+	})();
+
+	function toggleTheme() {
+		const html = document.documentElement;
+		const next =
+			html.getAttribute("data-theme") === "dark" ? "light" : "dark";
+
+		html.setAttribute("data-theme", next);
+		localStorage.setItem("savefinder-theme", next);
+	}
+</script>

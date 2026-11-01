@@ -1,31 +1,32 @@
 """FastAPI application factory.
 
-The import page is the first client of the JSON API. Item browsing and the
-library UI arrive in phase 5 and will reuse the same backend.
+The web interface provides the library, pipeline and taxonomy views.
+The JSON API handles imports and item processing.
 """
 
 from __future__ import annotations
 
+import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated
-from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import func, inspect, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from save_finder import __version__
 from save_finder.config import Settings, ensure_directories, load_settings
 from save_finder.db import make_engine, make_session_factory, session_scope
-from save_finder.errors import ExportImportError, SaveFinderError
-from save_finder.importer import copy_upload, import_export
+from save_finder.models import Item, ItemTag, PipelineJob, Tag, TagLevel, utc_now_iso
 from save_finder.platforms.registry import available_platforms
+from save_finder.web import api as web_api
+
+logger = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).parent
 
@@ -38,10 +39,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     session_factory: sessionmaker[Session] = make_session_factory(engine)
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if inspect(engine).has_table("pipeline_jobs"):
+            with session_scope(session_factory) as session:
+                session.execute(
+                    update(PipelineJob)
+                    .where(PipelineJob.status == "running")
+                    .values(
+                        status="interrupted",
+                        finished_at=utc_now_iso(),
+                        error="Server restarted while job was running",
+                    )
+                )
+        else:
+            logger.warning("Database not initialized; run `save-finder db init`.")
+
         try:
             yield
         finally:
+            app.state.shutdown_event.set()
+
+            while True:
+                with app.state.background_tasks_lock:
+                    tasks = list(app.state.background_tasks)
+
+                if not tasks:
+                    break
+
+                for task in tasks:
+                    task.join()
+
             engine.dispose()
 
     app = FastAPI(
@@ -52,21 +79,146 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.session_factory = session_factory
+    app.state.background_tasks = set()
+    app.state.background_tasks_lock = threading.Lock()
+    app.state.shutdown_event = threading.Event()
 
     templates = Jinja2Templates(directory=WEB_DIR / "templates")
     app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+    app.mount(
+        "/data/thumbs",
+        StaticFiles(directory=str(settings.paths.thumbs)),
+        name="thumbs",
+    )
+
+    @app.get("/item/{item_id}", response_class=HTMLResponse, include_in_schema=False)
+    def item_detail(request: Request, item_id: int) -> HTMLResponse:
+        with session_scope(app.state.session_factory) as session:
+            item = session.get(Item, item_id)
+            if item is None:
+                raise HTTPException(status_code=404, detail="item not found")
+
+            rows = session.execute(
+                select(ItemTag, Tag)
+                .join(Tag, Tag.id == ItemTag.tag_id)
+                .where(ItemTag.item_id == item_id)
+                .order_by(Tag.level, Tag.name)
+            ).all()
+            tag_list = [
+                {
+                    "slug": tag.slug,
+                    "name": tag.name,
+                    "confidence": item_tag.confidence,
+                    "source": item_tag.source.value,
+                }
+                for item_tag, tag in rows
+            ]
+
+        return templates.TemplateResponse(
+            request=request,
+            name="item.html",
+            context={
+                "app_name": settings.app_name,
+                "item": item,
+                "tags": tag_list,
+            },
+        )
+
+    @app.get("/pipeline", response_class=HTMLResponse, include_in_schema=False)
+    def pipeline(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request,
+            name="pipeline.html",
+            context={"app_name": settings.app_name, "page": "pipeline"},
+        )
+
+    @app.get("/tags", response_class=HTMLResponse, include_in_schema=False)
+    def tags(request: Request) -> HTMLResponse:
+        with session_scope(app.state.session_factory) as session:
+            rows = session.execute(
+                select(Tag, func.count(ItemTag.item_id).label("count"))
+                .join(ItemTag, ItemTag.tag_id == Tag.id)
+                .where(Tag.level == TagLevel.BROAD)
+                .group_by(Tag.id)
+                .order_by(func.count(ItemTag.item_id).desc(), Tag.name)
+            ).all()
+
+            tags_data = []
+            for tag, count in rows[:20]:
+                thumbs = session.scalars(
+                    select(Item.thumb_path)
+                    .join(ItemTag, Item.id == ItemTag.item_id)
+                    .where(ItemTag.tag_id == tag.id)
+                    .limit(4)
+                ).all()
+                tags_data.append(
+                    {
+                        "slug": tag.slug,
+                        "name": tag.name,
+                        "count": count,
+                        "thumbs": [thumb for thumb in thumbs if thumb],
+                    }
+                )
+
+        return templates.TemplateResponse(
+            request=request,
+            name="tags.html",
+            context={
+                "app_name": settings.app_name,
+                "tags": tags_data,
+                "page": "tags",
+            },
+        )
+
+    @app.get("/tag/{tag_slug}", response_class=HTMLResponse, include_in_schema=False)
+    def tag_detail(request: Request, tag_slug: str) -> HTMLResponse:
+        with session_scope(app.state.session_factory) as session:
+            tag = session.scalar(select(Tag).where(Tag.slug == tag_slug))
+            if tag is None:
+                raise HTTPException(status_code=404, detail="tag not found")
+
+            count = (
+                session.execute(
+                    select(func.count())
+                    .select_from(Item)
+                    .join(ItemTag, Item.id == ItemTag.item_id)
+                    .where(ItemTag.tag_id == tag.id)
+                ).scalar()
+                or 0
+            )
+
+        return templates.TemplateResponse(
+            request=request,
+            name="tag.html",
+            context={
+                "app_name": settings.app_name,
+                "tag_name": tag.name,
+                "tag_slug": tag.slug,
+                "count": count,
+                "page": "tag",
+            },
+        )
+
+    @app.get("/library", response_class=HTMLResponse, include_in_schema=False)
+    def library(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request,
+            name="library.html",
+            context={"app_name": settings.app_name, "page": "library"},
+        )
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def index(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
             request=request,
-            name="import.html",
+            name="home.html",
             context={
                 "app_name": settings.app_name,
                 "version": __version__,
-                "max_upload_mb": settings.import_config.max_archive_mb,
             },
         )
+
+    app.include_router(web_api.router)
 
     @app.get("/api/health", tags=["system"])
     def health() -> dict[str, object]:
@@ -75,43 +227,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "version": __version__,
             "platforms": list(available_platforms()),
         }
-
-    @app.post("/api/import", tags=["import"])
-    def upload_import(
-        file: Annotated[UploadFile, File(description="Official export ZIP.")],
-        platform: Annotated[str, Form()] = "instagram",
-    ) -> dict[str, object]:
-        upload = settings.paths.tmp / f"upload-{uuid4().hex}.zip"
-        try:
-            file.file.seek(0)
-            try:
-                copy_upload(
-                    file.file,
-                    upload,
-                    max_bytes=settings.import_config.max_archive_bytes,
-                )
-                with session_scope(session_factory) as session:
-                    result = import_export(
-                        session,
-                        platform=platform,
-                        path=upload,
-                        tmp_dir=settings.paths.tmp,
-                        limits=settings.import_config,
-                    )
-            except ExportImportError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-            except SaveFinderError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-            except OperationalError as exc:
-                raise HTTPException(
-                    status_code=503,
-                    detail="Banco não inicializado. Execute `save-finder db init`.",
-                ) from exc
-        finally:
-            upload.unlink(missing_ok=True)
-
-        payload = asdict(result)
-        payload["total"] = result.total
-        return payload
 
     return app

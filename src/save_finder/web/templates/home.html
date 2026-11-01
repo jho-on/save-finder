@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+	<head>
+		<script>
+			(function () {
+				const saved = localStorage.getItem("savefinder-theme");
+				if (saved) {
+					document.documentElement.setAttribute("data-theme", saved);
+				}
+			})();
+		</script>
+
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<title>{{ app_name }} — Biblioteca local de mídia</title>
+		<meta
+			name="description"
+			content="Organize, explore e classifique automaticamente suas mídias salvas nas redes sociais."
+		/>
+
+		<link rel="stylesheet" href="/static/style.css" />
+
+		<style>
+			:root,
+			[data-theme="light"] {
+				--bg: #ffffff;
+				--fg: #000000;
+				--surface: #ffffff;
+				--border: #000000;
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
+				--accent: var(--brand-yellow);
+				--error: var(--brand-pink);
+			}
+
+			[data-theme="dark"] {
+				--bg: #000000;
+				--fg: #ffffff;
+				--surface: #000000;
+				--border: #ffffff;
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
+				--accent: var(--brand-yellow);
+				--error: var(--brand-pink);
+			}
+
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--fg);
+				font-family: system-ui, sans-serif;
+			}
+
+			.home-shell {
+				width: min(1100px, calc(100% - 2rem));
+				margin: 0 auto;
+				padding: 3rem 0 4rem;
+			}
+
+			.hero {
+				padding: 3rem 0 3.5rem;
+				border-bottom: 2px solid var(--border);
+			}
+
+			.eyebrow {
+				margin: 0 0 1rem;
+				color: var(--brand-pink);
+				font-size: 0.85rem;
+				font-weight: 800;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+			}
+
+			.hero h1 {
+				max-width: 850px;
+				margin: 0;
+				color: var(--fg);
+				font-size: clamp(2.5rem, 7vw, 5rem);
+				line-height: 1.02;
+				letter-spacing: -0.065em;
+			}
+
+			.hero h1 span {
+				color: var(--brand-pink);
+			}
+
+			.hero-description {
+				max-width: 680px;
+				margin: 1.5rem 0 0;
+				color: var(--fg);
+				font-size: 1.15rem;
+				line-height: 1.7;
+			}
+
+			.hero-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.75rem;
+				margin-top: 2rem;
+			}
+
+			.action-link {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 44px;
+				box-sizing: border-box;
+				padding: 0.7rem 1.2rem;
+				border: 2px solid var(--fg);
+				border-radius: 4px;
+				background: var(--fg);
+				color: var(--bg);
+				font-weight: 800;
+				text-decoration: none;
+				transition:
+					background 0.15s,
+					color 0.15s,
+					border-color 0.15s;
+			}
+
+			.action-link:hover {
+				background: var(--brand-yellow);
+				border-color: var(--brand-yellow);
+				color: #000000;
+			}
+
+			.action-link.secondary {
+				background: var(--surface);
+				color: var(--fg);
+			}
+
+			.action-link.secondary:hover {
+				background: var(--brand-pink);
+				border-color: var(--brand-pink);
+				color: #000000;
+			}
+
+			.section {
+				padding: 3rem 0;
+				border-bottom: 2px solid var(--border);
+			}
+
+			.section-heading {
+				margin: 0 0 0.75rem;
+				color: var(--fg);
+				font-size: clamp(1.6rem, 4vw, 2.2rem);
+				letter-spacing: -0.04em;
+			}
+
+			.section-description {
+				max-width: 700px;
+				margin: 0 0 2rem;
+				color: var(--fg);
+				line-height: 1.7;
+			}
+
+			.steps {
+				display: grid;
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+				gap: 1rem;
+			}
+
+			.step {
+				box-sizing: border-box;
+				min-height: 190px;
+				padding: 1.25rem;
+				border: 2px solid var(--border);
+				border-top: 2px solid transparent;
+				border-image: linear-gradient(
+						to right,
+						var(--brand-yellow) 0 50%,
+						var(--brand-pink) 50% 100%
+					)
+					1;
+			}
+
+			.step-number {
+				display: inline-block;
+				margin-bottom: 1rem;
+				color: var(--brand-pink);
+				font-size: 0.85rem;
+				font-weight: 900;
+				letter-spacing: 0.08em;
+			}
+
+			.step h3 {
+				margin: 0 0 0.5rem;
+				color: var(--fg);
+				font-size: 1.1rem;
+			}
+
+			.step p {
+				margin: 0;
+				color: var(--fg);
+				font-size: 0.95rem;
+				line-height: 1.6;
+			}
+
+			.privacy-grid {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 1rem;
+			}
+
+			.privacy-item {
+				padding: 1rem 1.25rem;
+				border-left: 4px solid var(--brand-yellow);
+			}
+
+			.privacy-item:nth-child(even) {
+				border-left-color: var(--brand-pink);
+			}
+
+			.privacy-item h3 {
+				margin: 0 0 0.4rem;
+				color: var(--fg);
+				font-size: 1rem;
+			}
+
+			.privacy-item p {
+				margin: 0;
+				color: var(--fg);
+				line-height: 1.6;
+			}
+
+			.instagram-guide {
+				padding: 1.5rem;
+				border: 2px solid var(--border);
+				border-top: 2px solid transparent;
+				border-image: linear-gradient(
+						to right,
+						var(--brand-yellow) 0 50%,
+						var(--brand-pink) 50% 100%
+					)
+					1;
+			}
+
+			.instagram-guide ol {
+				padding-left: 1.5rem;
+				line-height: 1.9;
+			}
+
+			.instagram-guide strong {
+				color: var(--brand-pink);
+			}
+
+			.guide-note {
+				margin: 1rem 0 0;
+				padding-left: 1rem;
+				border-left: 4px solid var(--brand-yellow);
+				line-height: 1.6;
+			}
+
+			.final-cta {
+				padding: 3rem 0 0;
+			}
+
+			.final-cta h2 {
+				max-width: 700px;
+				margin: 0;
+				color: var(--fg);
+				font-size: clamp(1.8rem, 5vw, 3rem);
+				letter-spacing: -0.05em;
+			}
+
+			.final-cta p {
+				max-width: 650px;
+				margin: 1rem 0 0;
+				line-height: 1.7;
+			}
+
+			.home-footer {
+				margin-top: 3rem;
+				padding-top: 1rem;
+				border-top: 2px solid var(--border);
+				font-size: 0.85rem;
+			}
+
+			@media (max-width: 800px) {
+				.steps {
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+				}
+			}
+
+			@media (max-width: 600px) {
+				.home-shell {
+					padding-top: 1.5rem;
+				}
+
+				.hero {
+					padding: 2rem 0 2.5rem;
+				}
+
+				.steps,
+				.privacy-grid {
+					grid-template-columns: 1fr;
+				}
+
+				.step {
+					min-height: 0;
+				}
+
+				.hero-actions {
+					flex-direction: column;
+				}
+
+				.action-link {
+					width: 100%;
+				}
+			}
+		</style>
+	</head>
+
+	<body>
+		{% include "nav.html" %}
+
+		<main class="home-shell">
+			<section class="hero">
+				<p class="eyebrow">Sua biblioteca pessoal</p>
+
+				<h1>Seus salvos, <span>organizados.</span></h1>
+
+				<p class="hero-description">
+					O SaveFinder transforma suas exportações de conteúdos salvos
+					em uma biblioteca local pesquisável, com metadados,
+					thumbnails e classificação automática por tags.
+				</p>
+
+				<div class="hero-actions">
+					<a href="/pipeline" class="action-link">
+						Importar exportação
+					</a>
+
+					<a href="/library" class="action-link secondary">
+						Explorar biblioteca
+					</a>
+				</div>
+			</section>
+
+			<section class="section">
+				<h2 class="section-heading">Como funciona</h2>
+
+				<p class="section-description">
+					O processamento acontece em etapas. Você importa sua
+					exportação e depois acompanha cada fase pelo painel.
+				</p>
+
+				<div class="steps">
+					<article class="step">
+						<span class="step-number">01 / EXPORTAÇÃO</span>
+						<h3>Exporte seus salvos</h3>
+						<p>
+							Solicite ao Instagram uma cópia das suas
+							informações, selecionando os conteúdos salvos e o
+							formato JSON.
+						</p>
+					</article>
+
+					<article class="step">
+						<span class="step-number">02 / IMPORTAÇÃO</span>
+						<h3>Envie o arquivo ZIP</h3>
+						<p>
+							Arraste o ZIP da exportação para a área de
+							importação no painel. Não é necessário
+							descompactá-lo.
+						</p>
+					</article>
+
+					<article class="step">
+						<span class="step-number">03 / ENRIQUECIMENTO</span>
+						<h3>Enriqueça os itens</h3>
+						<p>
+							O SaveFinder busca metadados públicos, como autor,
+							legenda, tipo de publicação e quantidade de mídias.
+						</p>
+					</article>
+
+					<article class="step">
+						<span class="step-number">04 / DOWNLOAD</span>
+						<h3>Processe as mídias</h3>
+						<p>
+							As mídias são baixadas temporariamente para análise,
+							geração de thumbnails e extração de informações.
+						</p>
+					</article>
+
+					<article class="step">
+						<span class="step-number">05 / CLASSIFICAÇÃO</span>
+						<h3>Classifique automaticamente</h3>
+						<p>
+							O sistema associa os conteúdos às tags da taxonomia
+							configurada no projeto.
+						</p>
+					</article>
+
+					<article class="step">
+						<span class="step-number">06 / BIBLIOTECA</span>
+						<h3>Explore sua coleção</h3>
+						<p>
+							Consulte os itens, pesquise conteúdos e navegue
+							pelas categorias e tags da sua biblioteca.
+						</p>
+					</article>
+				</div>
+			</section>
+
+			<section class="section">
+				<h2 class="section-heading">Começando pelo Instagram</h2>
+
+				<p class="section-description">
+					Para importar seus conteúdos salvos, primeiro solicite uma
+					exportação oficial da sua conta.
+				</p>
+
+				<div class="instagram-guide">
+					<ol>
+						<li>Abra as configurações do Instagram.</li>
+						<li>Entre na <strong>Central de Contas</strong>.</li>
+						<li>
+							Acesse
+							<strong>Suas informações e permissões</strong>.
+						</li>
+						<li>
+							Selecione <strong>Baixar suas informações</strong>.
+						</li>
+						<li>
+							Escolha <strong>Salvos</strong>, formato
+							<strong>JSON</strong> e todo o período.
+						</li>
+						<li>Solicite e baixe a exportação.</li>
+						<li>Envie o ZIP pela área de importação do painel.</li>
+					</ol>
+
+					<p class="guide-note">
+						O SaveFinder identifica os arquivos relevantes dentro do
+						ZIP. Não é necessário renomear ou extrair o arquivo
+						manualmente.
+					</p>
+
+					<div class="hero-actions">
+						<a href="/pipeline" class="action-link">
+							Abrir painel de importação
+						</a>
+					</div>
+				</div>
+			</section>
+
+			<section class="section">
+				<h2 class="section-heading">Seus dados, localmente</h2>
+
+				<p class="section-description">
+					O SaveFinder foi projetado para organizar sua coleção sem
+					transformar o conteúdo salvo em uma cópia permanente das
+					mídias originais.
+				</p>
+
+				<div class="privacy-grid">
+					<article class="privacy-item">
+						<h3>Sem escrita na plataforma</h3>
+						<p>
+							O sistema não publica, altera ou remove conteúdos na
+							rede social de origem.
+						</p>
+					</article>
+
+					<article class="privacy-item">
+						<h3>Mídias temporárias</h3>
+						<p>
+							Os arquivos originais são mantidos apenas durante o
+							processamento e removidos ao final.
+						</p>
+					</article>
+
+					<article class="privacy-item">
+						<h3>Metadados persistentes</h3>
+						<p>
+							A biblioteca mantém informações, thumbnails,
+							transcrições, embeddings e tags.
+						</p>
+					</article>
+
+					<article class="privacy-item">
+						<h3>Taxonomia controlada</h3>
+						<p>
+							A classificação utiliza uma lista fechada e
+							versionada de tags.
+						</p>
+					</article>
+				</div>
+			</section>
+
+			<section class="final-cta">
+				<h2>Sua biblioteca começa com uma exportação.</h2>
+
+				<p>
+					Importe seus salvos e acompanhe o processamento pelo painel.
+					Depois, explore sua coleção na biblioteca.
+				</p>
+
+				<div class="hero-actions">
+					<a href="/pipeline" class="action-link"> Começar agora </a>
+
+					<a href="/library" class="action-link secondary">
+						Ver biblioteca
+					</a>
+				</div>
+			</section>
+
+			<footer class="home-footer">
+				<p>{{ app_name }} · Versão {{ version }}</p>
+			</footer>
+		</main>
+	</body>
+</html>

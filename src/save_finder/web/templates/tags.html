@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+	<head>
+		<script>
+			(function () {
+				const s = localStorage.getItem("savefinder-theme");
+				if (s) document.documentElement.setAttribute("data-theme", s);
+			})();
+		</script>
+
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<title>Tags — {{ app_name }}</title>
+
+		<link rel="stylesheet" href="/static/style.css" />
+
+		<style>
+			:root,
+			[data-theme="light"] {
+				--bg: #ffffff;
+				--fg: #000000;
+				--surface: #ffffff;
+				--border: #000000;
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
+				--accent: var(--brand-yellow);
+				--error: var(--brand-pink);
+			}
+
+			[data-theme="dark"] {
+				--bg: #000000;
+				--fg: #ffffff;
+				--surface: #000000;
+				--border: #ffffff;
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
+				--accent: var(--brand-yellow);
+				--error: var(--brand-pink);
+			}
+
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--fg);
+				font-family: system-ui, sans-serif;
+			}
+
+			.shell {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 2rem 1rem;
+			}
+
+			.intro {
+				margin-bottom: 2rem;
+			}
+
+			.intro .eyebrow a {
+				color: var(--brand-pink);
+				text-decoration: none;
+				font-weight: 600;
+			}
+
+			.intro .eyebrow a:hover {
+				color: var(--brand-yellow);
+			}
+
+			.intro .lede {
+				color: var(--fg);
+			}
+
+			.library {
+				width: 100%;
+			}
+
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+				grid-auto-rows: 1fr;
+				gap: 1rem;
+				align-items: stretch;
+			}
+
+			.tag-link {
+				display: block;
+				min-width: 0;
+				color: inherit;
+				text-decoration: none;
+			}
+
+			.card {
+				display: flex;
+				flex-direction: column;
+				height: 100%;
+				min-height: 320px;
+				box-sizing: border-box;
+				padding: 1rem;
+				background: var(--surface);
+				color: var(--fg);
+				border: 2px solid var(--border);
+				border-top: 2px solid transparent;
+				border-image: linear-gradient(
+						to right,
+						var(--brand-yellow) 0 50%,
+						var(--brand-pink) 50% 100%
+					)
+					1;
+				border-radius: 8px;
+				cursor: pointer;
+				transition: transform 0.15s;
+			}
+
+			.tag-link:hover .card {
+				transform: translateY(-3px);
+			}
+
+			.card h3 {
+				margin: 0 0 0.25rem;
+				color: var(--fg);
+				font-size: 1.1rem;
+			}
+
+			.tag-info {
+				margin: 0.25rem 0 1rem;
+				color: var(--fg);
+				font-size: 0.85rem;
+				overflow-wrap: anywhere;
+			}
+
+			.tag-count {
+				display: inline-block;
+				padding: 0.15rem 0.4rem;
+				border: 1px solid var(--brand-yellow);
+				border-radius: 4px;
+			}
+
+			.thumb-grid {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				grid-template-rows: repeat(2, minmax(0, 1fr));
+				grid-auto-flow: row;
+				gap: 0.25rem;
+				width: 100%;
+				aspect-ratio: 1 / 1;
+				margin-top: auto;
+			}
+
+			.thumb-cell {
+				min-width: 0;
+				min-height: 0;
+				overflow: hidden;
+				aspect-ratio: 1 / 1;
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 4px;
+			}
+
+			.thumb-cell img {
+				display: block;
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+			}
+
+			.thumb-empty {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				border: 1px dashed var(--brand-pink);
+			}
+
+			.thumb-empty span {
+				color: var(--fg);
+				font-size: 0.75rem;
+				text-align: center;
+			}
+
+			@media (max-width: 900px) {
+				.grid {
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+				}
+			}
+
+			@media (max-width: 600px) {
+				.shell {
+					padding: 1.25rem 0.75rem;
+				}
+
+				.grid {
+					grid-template-columns: 1fr;
+				}
+
+				.card {
+					min-height: 300px;
+				}
+			}
+		</style>
+	</head>
+
+	<body>
+		{% include 'nav.html' %}
+
+		<main class="shell">
+			<header class="intro">
+				<p class="eyebrow">
+					<a href="/library">← Biblioteca</a>
+				</p>
+
+				<h1>Tags</h1>
+
+				<p class="lede">Tags de classificação com itens associados.</p>
+			</header>
+
+			<section class="library">
+				<div class="grid">
+					{% for tag in tags %}
+					<a href="/tag/{{ tag.slug }}" class="tag-link">
+						<article class="card">
+							<h3>{{ tag.name }}</h3>
+
+							<p class="tag-info">
+								{{ tag.slug }} ·
+								<span class="tag-count">
+									{{ tag.count }} item{% if tag.count != 1
+									%}s{% endif %}
+								</span>
+							</p>
+
+							<div class="thumb-grid">
+								{% for thumb in tag.thumbs[:4] %}
+								<div class="thumb-cell">
+									<img
+										src="/data/{{ thumb }}"
+										alt=""
+										loading="lazy"
+									/>
+								</div>
+								{% endfor %} {% for i in range(4 -
+								(tag.thumbs|length if tag.thumbs else 0)) %}
+								<div class="thumb-cell thumb-empty"></div>
+								{% endfor %}
+							</div>
+						</article>
+					</a>
+					{% endfor %}
+				</div>
+			</section>
+		</main>
+
+		<script>
+			function toggleTheme() {
+				const html = document.documentElement;
+				const n =
+					html.getAttribute("data-theme") === "dark"
+						? "light"
+						: "dark";
+
+				html.setAttribute("data-theme", n);
+				localStorage.setItem("savefinder-theme", n);
+			}
+		</script>
+	</body>
+</html>

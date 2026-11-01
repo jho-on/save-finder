@@ -53,8 +53,10 @@ A taxonomia fechada fica em [`config/taxonomy.yaml`](config/taxonomy.yaml), gera
 .venv/bin/save-finder serve
 ```
 
-Abra `http://127.0.0.1:8000` e arraste o ZIP da exportação. É o caminho recomendado para
-uso manual: não precisa descompactar e o arquivo é apagado ao final.
+Abra `http://127.0.0.1:8000/pipeline` e arraste o ZIP da exportação. É o caminho recomendado
+para uso manual: não precisa descompactar e o arquivo é apagado ao final. O painel acompanha
+importação, enriquecimento, download e classificação por etapas. A biblioteca fica em
+`/library` e as tags em `/tags`.
 
 A CLI faz a mesma importação sem abrir o navegador, útil para automação ou para processar
 vários arquivos:
@@ -78,13 +80,15 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 
 # classificação automática pelas tags da taxonomia
 .venv/bin/save-finder classify --limit 30
-```
 
 # contagens por status e plataforma
 .venv/bin/save-finder stats
 
 # valida a taxonomia
 .venv/bin/save-finder taxonomy validate
+
+# apaga o conteúdo, preservando schema e taxonomia (pede confirmação)
+.venv/bin/save-finder db reset
 ```
 
 `enrich` grava autor, caption, tipo do post, número de peças, duração e o caminho local da
@@ -92,10 +96,9 @@ thumbnail. A imagem de capa vai para `data/thumbs/`; nenhuma URL de CDN é persi
 Posts privados, removidos ou bloqueados ficam como `unavailable`; falhas nossas ficam como
 `error`. Reexecutar o comando pega apenas os itens ainda pendentes.
 
-A API expõe `GET /api/health` e `POST /api/import`; documentação interativa em `/docs`.
-
-Comandos previstos no plano (`analyze`, `classify`, `pipeline`) serão adicionados
-conforme as fases avançarem.
+A API expõe `GET /api/health`, listagem/busca em `/api/items`, execução do pipeline em
+`POST /api/pipeline/*` e acompanhamento dos jobs. A referência completa está em
+[`docs/api.md`](docs/api.md); documentação interativa em `/docs`.
 
 ### Export do Instagram
 

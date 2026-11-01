@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+	<head>
+		<script>
+			(function () {
+				const s = localStorage.getItem("savefinder-theme");
+				if (s) document.documentElement.setAttribute("data-theme", s);
+			})();
+		</script>
+
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<title>Biblioteca — {{ app_name }}</title>
+
+		<link rel="stylesheet" href="/static/style.css" />
+
+		<style>
+			:root,
+			[data-theme="light"] {
+				--bg: #ffffff;
+				--fg: #000000;
+				--surface: #ffffff;
+				--border: #000000;
+
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
+
+				--accent: var(--brand-yellow);
+				--error: var(--brand-pink);
+			}
+
+			[data-theme="dark"] {
+				--bg: #000000;
+				--fg: #ffffff;
+				--surface: #000000;
+				--border: #ffffff;
+
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
+
+				--accent: var(--brand-yellow);
+				--error: var(--brand-pink);
+			}
+
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--fg);
+				font-family: system-ui, sans-serif;
+			}
+
+			.shell {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 2rem 1rem;
+			}
+
+			h1,
+			h2,
+			h3 {
+				color: var(--fg);
+				letter-spacing: -0.02em;
+			}
+
+			a {
+				color: var(--fg);
+			}
+
+			.intro a {
+				font-weight: 700;
+				text-decoration: underline;
+				text-decoration-color: var(--brand-pink);
+				text-decoration-thickness: 2px;
+				text-underline-offset: 3px;
+			}
+
+			.intro a:hover {
+				text-decoration-color: var(--brand-yellow);
+			}
+
+			.lede {
+				color: var(--fg);
+				line-height: 1.6;
+			}
+
+			.card {
+				box-sizing: border-box;
+				height: 100%;
+				padding: 1rem;
+				background: var(--surface);
+				color: var(--fg);
+				border: 2px solid var(--border);
+				border-top: 2px solid var(--brand-yellow);
+				border-image: linear-gradient(
+						to right,
+						var(--brand-yellow) 0 50%,
+						var(--brand-pink) 50% 100%
+					)
+					1;
+				border-radius: 4px;
+			}
+
+			button {
+				background: var(--fg);
+				color: var(--bg);
+				border: 2px solid var(--fg);
+				padding: 0.5rem 1rem;
+				border-radius: 4px;
+				cursor: pointer;
+				font-weight: 700;
+				transition:
+					background 0.15s,
+					color 0.15s,
+					border-color 0.15s;
+			}
+
+			button:hover:not(:disabled) {
+				background: var(--brand-yellow);
+				color: #000000;
+				border-color: var(--brand-yellow);
+			}
+
+			button:focus-visible,
+			input:focus-visible {
+				outline: 3px solid var(--brand-pink);
+				outline-offset: 3px;
+			}
+
+			.sticky-top {
+				position: sticky;
+				top: var(--nav-height, 60px);
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				padding: 0.75rem 0;
+				margin-bottom: 1rem;
+				background: var(--bg);
+				border-bottom: 2px solid var(--border);
+			}
+
+			.sticky-top input {
+				box-sizing: border-box;
+				min-width: 0;
+				flex: 1;
+				width: 60%;
+				padding: 0.6rem 0.75rem;
+				border: 2px solid var(--border);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+				font-family: inherit;
+				font-size: 1rem;
+			}
+
+			.sticky-top input::placeholder {
+				color: var(--fg);
+			}
+
+			.sticky-top button {
+				flex: 0 0 auto;
+			}
+
+			.sticky-bottom {
+				position: sticky;
+				bottom: 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				padding: 0.75rem 1rem;
+				margin-top: 1rem;
+				background: var(--bg);
+				border-top: 2px solid var(--border);
+			}
+
+			.sticky-bottom button {
+				display: inline-flex;
+				align-items: center;
+				flex: 0 0 auto;
+				width: auto;
+				min-width: 0;
+				gap: 0.25rem;
+				padding: 0.5rem 0.65rem;
+				border: 1px solid var(--border);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+				font-size: 0.85rem;
+			}
+
+			.sticky-bottom button:hover:not(:disabled) {
+				background: var(--brand-pink);
+				color: #000000;
+				border-color: var(--brand-pink);
+			}
+
+			.sticky-bottom button:disabled {
+				cursor: not-allowed;
+				border-style: dashed;
+			}
+
+			#page-info {
+				margin: 0;
+				color: var(--fg);
+				font-size: 0.9rem;
+				font-variant-numeric: tabular-nums;
+				text-align: center;
+			}
+
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+				gap: 1rem;
+			}
+
+			.grid > a {
+				display: block;
+				color: var(--fg);
+				text-decoration: none;
+			}
+
+			.grid .card {
+				transition:
+					transform 0.15s,
+					border-color 0.15s;
+			}
+
+			.grid > a:hover .card {
+				transform: translateY(-3px);
+				border-bottom-color: var(--brand-pink);
+			}
+
+			.grid .card img {
+				display: block;
+				box-sizing: border-box;
+				width: 100%;
+				aspect-ratio: 3 / 4;
+				object-fit: cover;
+				border-radius: 3px;
+			}
+
+			.grid .card h3 {
+				margin: 0.75rem 0 0;
+				color: var(--fg);
+				overflow-wrap: anywhere;
+			}
+
+			.item-description {
+				display: -webkit-box;
+				margin: 0.35rem 0;
+				overflow: hidden;
+				color: var(--fg);
+				font-size: 0.9rem;
+				overflow-wrap: anywhere;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+			}
+
+			.item-metadata {
+				margin: 0.35rem 0;
+				color: var(--fg);
+				font-size: 0.85rem;
+				line-height: 1.5;
+			}
+
+			.status-badge {
+				display: inline-block;
+				padding: 0.1rem 0.4rem;
+				border-radius: 3px;
+				background: var(--fg);
+				color: var(--bg);
+				font-weight: 700;
+			}
+
+			.status-badge.enriched {
+				background: var(--brand-yellow);
+				color: #000000;
+			}
+
+			.status-badge.error {
+				background: var(--brand-pink);
+				color: #000000;
+			}
+
+			.error-box {
+				padding: 0.75rem 1rem;
+				border: 2px solid var(--brand-pink);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+			}
+
+			@media (max-width: 900px) {
+				.grid {
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+				}
+			}
+
+			@media (max-width: 600px) {
+				.shell {
+					padding: 1.25rem 0.75rem;
+				}
+
+				.grid {
+					grid-template-columns: 1fr;
+				}
+
+				.sticky-bottom {
+					padding: 0.75rem 0;
+				}
+
+				#page-info {
+					font-size: 0.8rem;
+				}
+			}
+		</style>
+	</head>
+
+	<body>
+		{% include 'nav.html' %}
+
+		<main class="shell">
+			<header class="intro">
+				<p class="eyebrow">
+					<a href="/library">{{ app_name }}</a>
+				</p>
+
+				<h1>Biblioteca</h1>
+
+				<p class="lede">
+					Conteúdos salvos, metadados, thumbnails e tags de
+					classificação.
+				</p>
+			</header>
+
+			<section id="library" class="library">
+				<form
+					onsubmit="
+						event.preventDefault();
+
+						currentSearch = this.q.value.trim();
+						currentOffset = 0;
+
+						if (currentSearch) {
+							hxt(
+								'/api/items/search?q=' +
+									encodeURIComponent(currentSearch) +
+									'&status=classified&limit=' +
+									limit +
+									'&offset=0',
+							);
+						} else {
+							hxt(
+								'/api/items?status=classified&limit=' +
+									limit +
+									'&offset=0',
+							);
+						}
+
+						return false;
+					"
+					class="sticky-top"
+				>
+					<input
+						name="q"
+						type="text"
+						placeholder="Buscar..."
+						aria-label="Buscar"
+					/>
+
+					<button type="submit">Buscar</button>
+				</form>
+
+				<div id="items">
+					<p>Carregando...</p>
+				</div>
+
+				{% include "pagination.html" %}
+			</section>
+		</main>
+
+		<script>
+			function toggleTheme() {
+				const html = document.documentElement;
+				const current = html.getAttribute("data-theme") || "light";
+				const next = current === "dark" ? "light" : "dark";
+
+				html.setAttribute("data-theme", next);
+				localStorage.setItem("savefinder-theme", next);
+			}
+
+			(function () {
+				const saved = localStorage.getItem("savefinder-theme");
+
+				if (saved) {
+					document.documentElement.setAttribute("data-theme", saved);
+				}
+			})();
+
+			let currentOffset = 0;
+			const limit = 21;
+			let totalItems = 0;
+			let totalPages = 1;
+			let currentSearch = "";
+
+			function hxt(url) {
+				fetch(url)
+					.then((r) => r.json())
+					.then((d) => {
+						const c = document.getElementById("items");
+
+						if (!d.items || !d.items.length) {
+							c.innerHTML = "<p>Nenhum resultado.</p>";
+
+							document.getElementById("page-info").textContent =
+								"—";
+
+							document.getElementById("prev-button").disabled =
+								true;
+
+							document.getElementById("next-button").disabled =
+								true;
+
+							currentOffset = 0;
+							totalItems = 0;
+							totalPages = 1;
+							return;
+						}
+
+						currentOffset = d.offset || 0;
+						totalItems = d.total || 0;
+
+						const page = Math.floor(currentOffset / limit) + 1;
+
+						totalPages = Math.ceil(totalItems / limit) || 1;
+
+						document.getElementById("page-info").textContent =
+							"Página " +
+							page +
+							" de " +
+							totalPages +
+							" (" +
+							totalItems +
+							" itens)";
+
+						document.getElementById("prev-button").disabled =
+							currentOffset <= 0;
+
+						document.getElementById("next-button").disabled =
+							currentOffset + limit >= totalItems;
+
+						c.innerHTML =
+							'<div class="grid">' +
+							d.items
+								.map((i) => {
+									const thumb = i.thumb_path
+										? "/data/" + i.thumb_path
+										: "";
+
+									const tags =
+										(i.tags || [])
+											.map((t) => t.slug)
+											.join(", ") || "-";
+
+									const statusClass =
+										i.status === "error"
+											? "error"
+											: i.status === "enriched"
+												? "enriched"
+												: "";
+
+									return (
+										'<a href="/item/' +
+										i.id +
+										'"><article class="card">' +
+										(thumb
+											? '<img src="' +
+												thumb +
+												'" alt="" loading="lazy" />'
+											: "") +
+										"<h3>" +
+										(i.external_id || "") +
+										"</h3>" +
+										'<p class="item-description">' +
+										(i.author || "") +
+										(i.author && i.caption ? " — " : "") +
+										(i.caption || "") +
+										"</p>" +
+										'<p class="item-metadata"><strong>Tipo:</strong> ' +
+										(i.post_type || "-") +
+										" | <strong>Peças:</strong> " +
+										(i.media_count || 0) +
+										"</p>" +
+										'<p class="item-metadata"><strong>Tags:</strong> ' +
+										tags +
+										' | <strong>Status:</strong> <span class="status-badge ' +
+										statusClass +
+										'">' +
+										(i.status || "-") +
+										"</span></p>" +
+										"</article></a>"
+									);
+								})
+								.join("") +
+							"</div>";
+					})
+					.catch(() => {
+						document.getElementById("items").innerHTML =
+							'<p class="error-box">Erro ao carregar biblioteca.</p>';
+					});
+			}
+
+			function loadPage(offset) {
+				const url = currentSearch
+					? "/api/items/search?q=" +
+						encodeURIComponent(currentSearch) +
+						"&status=classified&limit=" +
+						limit +
+						"&offset=" +
+						offset
+					: "/api/items?status=classified&limit=" +
+						limit +
+						"&offset=" +
+						offset;
+
+				hxt(url);
+			}
+
+			function prevPage() {
+				if (currentOffset >= limit) {
+					loadPage(currentOffset - limit);
+				}
+			}
+
+			function nextPage() {
+				const nextOffset = currentOffset + limit;
+
+				if (nextOffset < totalItems) {
+					loadPage(nextOffset);
+				}
+			}
+
+			function loadStats() {
+				fetch("/api/pipeline/stats")
+					.then((r) => r.json())
+					.then((d) => {
+						const g = document.getElementById("stats-general");
+						if (!g) return;
+
+						g.innerHTML =
+							"<div><strong>Total</strong><br>" +
+							(d.general.total || 0) +
+							"</div>" +
+							"<div><strong>Enriquecidos</strong><br>" +
+							(d.general.enriched || 0) +
+							"</div>" +
+							"<div><strong>Pendentes</strong><br>" +
+							(d.general.pending || 0) +
+							"</div>" +
+							"<div><strong>Com erro</strong><br>" +
+							(d.general.error || 0) +
+							"</div>" +
+							"<div><strong>Com mídia</strong><br>" +
+							(d.general.with_media_assets || 0) +
+							"</div>" +
+							"<div><strong>Tagueados</strong><br>" +
+							(d.general.tagged || 0) +
+							"</div>";
+
+						const ops = document.getElementById("stats-ops");
+						if (!ops) return;
+
+						const opHTML = (label, info, color) => {
+							const pct =
+								info.percent != null
+									? info.percent.toFixed(1) + "%"
+									: "N/A";
+
+							const done = info.done || 0;
+							const target = info.target || 0;
+
+							const bar =
+								target > 0
+									? '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' +
+										pct +
+										";height:100%;background:" +
+										color +
+										';"></div></div>'
+									: "";
+
+							return (
+								"<div><strong>" +
+								label +
+								"</strong><br>" +
+								done +
+								" / " +
+								target +
+								" concluídos (" +
+								pct +
+								") " +
+								bar +
+								"</div>"
+							);
+						};
+
+						ops.innerHTML =
+							opHTML("Enrich", d.enrich, "var(--brand-yellow)") +
+							opHTML(
+								"Download",
+								d.download,
+								"var(--brand-pink)",
+							) +
+							opHTML(
+								"Classify",
+								d.classify,
+								"var(--brand-yellow)",
+							);
+					})
+					.catch(() => {
+						const g = document.getElementById("stats-general");
+
+						if (g) {
+							g.innerHTML =
+								"<p>Dados temporariamente indisponíveis.</p>";
+						}
+					});
+			}
+
+			loadStats();
+			setInterval(loadStats, 5000);
+
+			function updateOpFeedback(el, jobData) {
+				const status = jobData.status || "unknown";
+				const op = jobData.operation || "";
+				const result = jobData.result ? "concluído" : "";
+				const error = jobData.error ? "erro" : "";
+
+				const color =
+					status === "error"
+						? "var(--brand-pink)"
+						: "var(--brand-yellow)";
+
+				el.innerHTML =
+					'<div style="padding:.5rem;border:2px solid ' +
+					color +
+					';background:var(--surface);border-radius:4px;font-size:.9rem;color:var(--fg);">' +
+					"<strong>" +
+					op +
+					'</strong> — <span style="display:inline-block;padding:.1rem .4rem;background:' +
+					color +
+					';color:#000000;font-weight:bold;border-radius:3px;">' +
+					(status === "done"
+						? "Concluído"
+						: status === "running"
+							? "Em execução"
+							: status === "error"
+								? "Erro"
+								: "Iniciado") +
+					"</span><br/>" +
+					"<span>Job: " +
+					(jobData.job_id || "-") +
+					"</span> " +
+					(result ? "| <strong>Resultado:</strong> " + result : "") +
+					(error ? "| <strong>Erro:</strong> " + error : "") +
+					"</div>";
+			}
+
+			function runPipeline(url, formData, formEl) {
+				const msg = formEl
+					.closest("article")
+					.querySelector('p[id^="res-"]');
+
+				msg.innerHTML =
+					'<div style="padding:.5rem;background:var(--surface);border:2px solid var(--brand-yellow);border-radius:4px;font-size:.9rem;color:var(--fg);"><strong>Iniciando...</strong> operação em segundo plano.</div>';
+
+				fetch(url, { method: "POST", body: formData })
+					.then((r) => r.json())
+					.then((d) => {
+						msg.innerHTML =
+							'<div style="padding:.5rem;background:var(--surface);border:2px solid var(--brand-yellow);border-radius:4px;font-size:.9rem;color:var(--fg);"><strong>Iniciado</strong> — ' +
+							d.operation +
+							" (job " +
+							d.job_id +
+							")</div>";
+
+						setTimeout(() => {
+							fetch("/api/pipeline/" + d.job_id)
+								.then((r) => r.json())
+								.then((s) => {
+									updateOpFeedback(msg, s);
+									loadStats();
+								})
+								.catch(() => {
+									loadStats();
+								});
+						}, 1500);
+					})
+					.catch((e) => {
+						msg.innerHTML =
+							'<div style="padding:.5rem;background:var(--surface);border:2px solid var(--brand-pink);border-radius:4px;font-size:.9rem;color:var(--fg);"><strong>Falha</strong> na requisição: ' +
+							e +
+							"</div>";
+					});
+			}
+
+			hxt("/api/items?status=classified&limit=21&offset=0");
+		</script>
+	</body>
+</html>
