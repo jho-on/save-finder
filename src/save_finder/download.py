@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -115,17 +116,29 @@ def download_item(
             # Persist media asset records (no file path in current schema)
             if session is not None:
                 for p in pieces:
-                    session.merge(
-                        MediaAsset(
-                            item_id=item_id,
-                            position=p.position,
-                            kind=p.kind,
-                            duration_seconds=p.duration_seconds,
-                            width=p.width,
-                            height=p.height,
-                            created_at=utc_now_iso(),
+                    existing = session.scalar(
+                        select(MediaAsset).where(
+                            MediaAsset.item_id == item_id,
+                            MediaAsset.position == p.position,
                         )
                     )
+                    if existing is not None:
+                        existing.duration_seconds = p.duration_seconds
+                        existing.width = p.width
+                        existing.height = p.height
+                        session.flush()
+                    else:
+                        session.add(
+                            MediaAsset(
+                                item_id=item_id,
+                                position=p.position,
+                                kind=p.kind,
+                                duration_seconds=p.duration_seconds,
+                                width=p.width,
+                                height=p.height,
+                                created_at=utc_now_iso(),
+                            )
+                        )
                 session.commit()
             result = DownloadResult(
                 item_id=item_id,

@@ -110,20 +110,29 @@ def get_item(session: Session, platform: str, external_id: str) -> Item | None:
 def list_pending_items(
     session: Session,
     *,
-    limit: int = 50,
+    limit: int | None = 50,
     platform: str | None = None,
     include_errors: bool = False,
 ) -> Sequence[Item]:
     """Return pending items in insertion order for a resumable batch."""
     statuses = (ItemStatus.PENDING, ItemStatus.ERROR) if include_errors else (ItemStatus.PENDING,)
+
     statement = select(Item).where(Item.status.in_(statuses))
+
     if platform is not None:
         statement = statement.where(Item.platform == platform)
+
     if include_errors:
-        statement = statement.order_by(case((Item.status == ItemStatus.ERROR, 0), else_=1), Item.id)
+        statement = statement.order_by(
+            case((Item.status == ItemStatus.ERROR, 0), else_=1),
+            Item.id,
+        )
     else:
         statement = statement.order_by(Item.id)
-    statement = statement.limit(limit)
+
+    if limit is not None:
+        statement = statement.limit(limit)
+
     return session.scalars(statement).all()
 
 
