@@ -269,3 +269,24 @@ class Run(Base):
     success_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str | None] = mapped_column(Text)
+
+
+class PipelineJob(Base):
+    __tablename__ = "pipeline_jobs"
+    __table_args__ = (
+        Index("ix_pipeline_jobs_status", "status"),
+        Index("ix_pipeline_jobs_started_at", "started_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    operation: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+
+    started_at: Mapped[str] = mapped_column(String(32), nullable=False, default=utc_now_iso)
+    finished_at: Mapped[str | None] = mapped_column(String(32))
+
+    params: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    progress: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    error: Mapped[str | None] = mapped_column(Text)
