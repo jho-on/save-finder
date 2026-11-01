@@ -6,10 +6,12 @@ import hashlib
 import logging
 import random
 import re
+import tempfile
+import threading
 import time
 from collections import Counter
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
@@ -81,11 +83,13 @@ def enrich_items(
     session: Session,
     settings: Settings,
     *,
-    limit: int = 30,
+    limit: int | None = 30,
     platform: str | None = None,
     retry_errors: bool = False,
     adapter_factory: AdapterFactory | None = None,
     thumbnail_fetcher: Callable[..., Path] | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
+    shutdown_event: threading.Event | None = None,
 ) -> EnrichReport:
     """Enrich pending items, committing each outcome independently.
 
@@ -122,38 +126,114 @@ def enrich_items(
     workers = max(1, min(settings.pipeline.max_concurrency, len(tasks)))
 
     results: list[_TaskResult] = []
-    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="enrich") as executor:
-        futures = {
-            executor.submit(
-                _enrich_one,
-                item_id,
-                item,
-                settings,
-                factory,
-                fetcher,
-            ): item_id
-            for item_id, item in tasks
-        }
-        for future in as_completed(futures):
-            item_id = futures[future]
-            result = future.result()
-            item = session.get(Item, item_id)
-            if item is not None:
-                if result.metadata is not None:
-                    save_enrichment(session, item, result.metadata, thumb_path=result.thumb_path)
-                else:
-                    mark_item_status(
-                        session,
-                        item,
-                        ItemStatus(result.outcome.status),
-                        error=result.outcome.error,
-                    )
-                session.commit()
-            results.append(result)
+
+    with ThreadPoolExecutor(
+        max_workers=workers,
+        thread_name_prefix="enrich",
+    ) as executor:
+        pending_tasks = iter(tasks)
+        futures = {}
+
+        def submit_available() -> None:
+            while len(futures) < workers and (
+                shutdown_event is None or not shutdown_event.is_set()
+            ):
+                try:
+                    item_id, item = next(pending_tasks)
+                except StopIteration:
+                    break
+
+                future = executor.submit(
+                    _enrich_one,
+                    item_id,
+                    item,
+                    settings,
+                    factory,
+                    fetcher,
+                )
+                futures[future] = item_id
+
+        submit_available()
+
+        while futures:
+            finished, _ = wait(
+                futures,
+                return_when=FIRST_COMPLETED,
+            )
+
+            for future in finished:
+                item_id = futures.pop(future)
+                result = future.result()
+
+                item = session.get(Item, item_id)
+                if item is not None:
+                    _persist_enrichment(session, item, result)
+                    session.commit()
+
+                results.append(result)
+
+                if progress_callback is not None:
+                    progress_callback(len(results), len(tasks))
+
+            submit_available()
 
     order = {item_id: index for index, (item_id, _item) in enumerate(tasks)}
     results.sort(key=lambda result: order.get(result.outcome.item_id, 0))
     return EnrichReport(tuple(result.outcome for result in results))
+
+
+def enrich_item(
+    session: Session,
+    item: Item,
+    settings: Settings,
+    *,
+    adapter_factory: AdapterFactory | None = None,
+    thumbnail_fetcher: Callable[..., Path] | None = None,
+) -> EnrichmentOutcome:
+    """Enrich and persist one item."""
+    saved_item = SavedItem(
+        platform=item.platform,
+        external_id=item.external_id,
+        url=item.url,
+        source=item.source.value,
+        author=item.author,
+        collection=item.collection,
+        saved_at=item.saved_at,
+    )
+
+    result = _enrich_one(
+        item.id,
+        saved_item,
+        settings,
+        adapter_factory or get_adapter,
+        thumbnail_fetcher or download_thumbnail,
+    )
+
+    _persist_enrichment(session, item, result)
+    session.commit()
+
+    return result.outcome
+
+
+def _persist_enrichment(
+    session: Session,
+    item: Item,
+    result: _TaskResult,
+) -> None:
+    if result.metadata is not None:
+        save_enrichment(
+            session,
+            item,
+            result.metadata,
+            thumb_path=result.thumb_path,
+        )
+    else:
+        mark_item_status(
+            session,
+            item,
+            ItemStatus(result.outcome.status),
+            error=result.outcome.error,
+        )
 
 
 def _enrich_one(
@@ -340,11 +420,26 @@ def download_thumbnail(
         raise EnrichError("thumbnail is empty")
 
     destination = dest_stem.with_suffix(CONTENT_TYPE_SUFFIXES.get(content_type, ".jpg"))
-    temporary = destination.with_suffix(destination.suffix + ".part")
+    temporary = None
+
     try:
-        temporary.write_bytes(data)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".part",
+            delete=False,
+        ) as temp_file:
+            temporary = Path(temp_file.name)
+            temp_file.write(data)
+
         temporary.replace(destination)
+
     except OSError as exc:
-        temporary.unlink(missing_ok=True)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
         raise EnrichError(f"could not store thumbnail: {exc}") from exc
+
     return destination
