@@ -98,6 +98,49 @@ def db_init() -> None:
     )
 
 
+@db_app.command("reset")
+def db_reset(
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip the confirmation prompt."),
+    ] = False,
+) -> None:
+    """Clear all content data, keeping the schema and the taxonomy."""
+    if not yes:
+        confirmed = typer.confirm(
+            "This deletes every item, asset, transcript, embedding and pipeline job. Continue?"
+        )
+        if not confirmed:
+            raise typer.Exit(code=1)
+
+    try:
+        from sqlalchemy import delete
+
+        from save_finder.db import make_engine, make_session_factory, session_scope
+        from save_finder.models import (
+            Embedding,
+            Item,
+            ItemTag,
+            MediaAsset,
+            PipelineJob,
+            Transcript,
+        )
+
+        settings = _settings()
+        with session_scope(make_session_factory(make_engine(settings))) as session:
+            session.execute(delete(MediaAsset))
+            session.execute(delete(Transcript))
+            session.execute(delete(Embedding))
+            session.execute(delete(ItemTag))
+            session.execute(delete(Item))
+            session.execute(delete(PipelineJob))
+            session.commit()
+        console.print("[green]Database reset complete (schema and taxonomy preserved).[/green]")
+    except SaveFinderError as exc:
+        console.print(f"[red]Database reset error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+
 @app.command("import")
 def import_export_command(
     platform: Annotated[str, typer.Argument(help="Platform slug, e.g. instagram.")],
@@ -219,11 +262,13 @@ def download_command(
         with _session_scope(settings) as session:
             from sqlalchemy import select
 
-            from save_finder.models import Item
+            from save_finder.models import Item, MediaAsset
 
-            items = session.scalars(
-                select(Item).where(Item.status == "enriched").limit(limit)
-            ).all()
+            query = select(Item).where(Item.status == "enriched")
+            if platform is not None:
+                query = query.where(Item.platform == platform)
+            query = query.where(~Item.id.in_(select(MediaAsset.item_id)))
+            items = session.scalars(query.limit(limit)).all()
             results = []
             for item in items:
                 res = download_item(
@@ -263,12 +308,15 @@ def classify_command(
         with _session_scope(settings) as session:
             from sqlalchemy import select
 
-            from save_finder.models import Item
+            from save_finder.models import Item, ItemStatus, ItemTag, MediaAsset
 
-            query = select(Item).where(Item.status == "enriched").limit(limit)
+            query = select(Item).where(Item.status == "enriched")
             if platform is not None:
                 query = query.where(Item.platform == platform)
-            items = session.scalars(query).all()
+            # Apenas itens baixados (possuem media assets) e não já tagueados
+            query = query.where(Item.id.in_(select(MediaAsset.item_id)))
+            query = query.where(~Item.id.in_(select(ItemTag.item_id)))
+            items = session.scalars(query.limit(limit)).all()
             table = Table(title="Classification (Fase 4)")
             table.add_column("Item")
             table.add_column("Tags")
@@ -289,6 +337,8 @@ def classify_command(
                     )
                     session.commit()
                     total_tags += len(result.tags)
+                item.status = ItemStatus.CLASSIFIED
+                session.commit()
                 table.add_row(
                     item.external_id,
                     ", ".join(result.tags) or "—",
