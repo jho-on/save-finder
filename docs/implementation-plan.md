@@ -93,6 +93,8 @@ Não existe campo de workspace ou locatário. O modelo assume um único dono.
 - Dois níveis: amplas e específicas subordinadas.
 - Cerca de 20 amplas no início; específicas entram conforme a necessidade real.
 - Fechada e versionada: o modelo não cria tag. Sugestão fora da lista é descartada; tag nova exige edição e revisão.
+- Cada item recebe **uma única tag ampla**, sempre acompanhada das específicas que pertencem a ela. Quando o texto aponta para mais de uma ampla, vence a primeira na ordem da taxonomia; sem sinal, o item recebe `outros`.
+- A página de tags agrupa e conta apenas pelas amplas; as específicas continuam visíveis no detalhe do item.
 - Tag específica selecionada sempre propaga a ampla correspondente.
 - Nomes exibidos em pt-BR; os slugs são neutros de idioma.
 - O conteúdo pode estar em qualquer idioma e é enviado ao classificador no idioma original.

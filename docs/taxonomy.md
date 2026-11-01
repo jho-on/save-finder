@@ -29,6 +29,7 @@
 | animais | Animais | pets, dogs, cats, wildlife, farm animals |
 | automotivo | Automotivo | cars, motorcycles, engines, car repair, driving |
 | bem-estar-e-espiritualidade | Bem-estar e espiritualidade | meditation, astrology, religious practice, self-care routine |
+| outros | Não classificado | content that cannot be confidently classified into any available category |
 
 ## Específicas
 

@@ -16,9 +16,9 @@ def taxonomy() -> Taxonomy:
 
 def test_taxonomy_matches_documented_counts(taxonomy: Taxonomy) -> None:
     assert taxonomy.version == 1
-    assert len(taxonomy.broad) == 20
+    assert len(taxonomy.broad) == 21
     assert len(taxonomy.specific) == 74
-    assert len(taxonomy) == 94
+    assert len(taxonomy) == 95
 
 
 def test_every_specific_tag_has_a_broad_parent(taxonomy: Taxonomy) -> None:

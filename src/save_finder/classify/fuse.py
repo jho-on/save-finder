@@ -35,7 +35,6 @@ def classify_item(
     ``taxonomy.yaml`` may be emitted) and preserves parent propagation.
     """
     caption = caption_text or item.caption or ""
-    post_type = item.post_type.value if item.post_type else None
     text_signals = " ".join(filter(None, [caption, transcript_text or ""]))
 
     # Simple heuristic + taxonomy match for MVP; full LLM/Vision fusion
@@ -51,19 +50,33 @@ def classify_item(
         if any(kw in text_signals.lower() for kw in keywords if kw):
             candidates.append(slug)
 
-    # Post-type hints when no text matches
-    if not candidates:
-        if post_type == "video":
-            candidates = ["video"]
-        elif post_type == "image":
-            candidates = ["photo"]
-        elif post_type == "carousel":
-            candidates = ["carousel"]
+    # Business rule: every item gets exactly one broad tag, plus the specific
+    # tags that belong to it. Specific tags never appear without their parent.
+    valid = [slug for slug in candidates if slug in taxonomy]
+    selected_broad: str | None = None
+    for slug in valid:
+        tag = taxonomy.get(slug)
+        if tag.is_broad:
+            selected_broad = tag.slug
+            break
+        if tag.parent is not None:
+            selected_broad = tag.parent
+            break
 
-    # Deduplicate and enforce taxonomy membership
-    emitted = tuple(
-        sorted(set(candidates) & {t.slug for t in (*taxonomy.broad, *taxonomy.specific)})
-    )
+    if selected_broad is None:
+        emitted = ("outros",)
+    else:
+        emitted = tuple(
+            sorted(
+                {selected_broad}
+                | {
+                    taxonomy.get(slug).slug
+                    for slug in valid
+                    if not taxonomy.get(slug).is_broad
+                    and taxonomy.get(slug).parent == selected_broad
+                }
+            )
+        )
     confidences = tuple(0.6 for _ in emitted)  # placeholder until calibration sample exists
     return ClassificationResult(
         item_id=item.id,
