@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from save_finder.classify.taxonomy import Taxonomy
@@ -19,6 +19,7 @@ def add_item_tags(
     *,
     confidences: Sequence[float] | None = None,
     source: str = "auto",
+    taxonomy: Taxonomy | None = None,
 ) -> int:
     """Persist taxonomy tags for one item, preserving parent rules.
 
@@ -28,7 +29,7 @@ def add_item_tags(
     Only tags present in the taxonomy are inserted; duplicates for the same
     item are updated unless the stored tag is manual.
     """
-    taxonomy = Taxonomy.load(load_settings().taxonomy_path)
+    taxonomy = taxonomy or Taxonomy.load(load_settings().taxonomy_path)
     definitions = {tag.slug: tag for tag in (*taxonomy.broad, *taxonomy.specific)}
 
     confidence_by_slug: dict[str, float] = {}
@@ -117,6 +118,47 @@ def add_item_tags(
         )
         inserted += 1
     session.flush()
+    return inserted
+
+
+def replace_auto_tags(
+    session: Session,
+    item_id: int,
+    tag_slugs: Sequence[str],
+    *,
+    confidences: Sequence[float] | None = None,
+    evidence: str | None = None,
+    taxonomy: Taxonomy | None = None,
+) -> int:
+    """Replace automatic tags while preserving manual corrections.
+
+    Reclassification must not accumulate stale automatic tags. Manual tags are
+    left untouched and continue to win over the new automatic result.
+    """
+    session.execute(
+        delete(ItemTag).where(
+            ItemTag.item_id == item_id,
+            ItemTag.source == TagSource.AUTO,
+        )
+    )
+    session.flush()
+    inserted = add_item_tags(
+        session,
+        item_id,
+        tag_slugs,
+        confidences=confidences,
+        source="auto",
+        taxonomy=taxonomy,
+    )
+    if evidence:
+        for item_tag in session.scalars(
+            select(ItemTag).where(
+                ItemTag.item_id == item_id,
+                ItemTag.source == TagSource.AUTO,
+            )
+        ):
+            item_tag.evidence = evidence
+        session.flush()
     return inserted
 
 

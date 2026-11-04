@@ -12,6 +12,7 @@ from uuid import uuid4
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import func, select, update
 
+from save_finder.classify.fuse import classify_persisted_item
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, ensure_directories
 from save_finder.db import session_scope
@@ -27,6 +28,9 @@ from save_finder.models import (
     Tag,
     utc_now_iso,
 )
+from save_finder.providers.base import LLMProvider, VisionProvider
+from save_finder.providers.factory import build_llm, build_vision
+from save_finder.repositories.tags import replace_auto_tags
 
 router = APIRouter(prefix="/api", tags=["library"])
 
@@ -255,35 +259,43 @@ def _download_one(item_id: int, settings: Settings, session_factory) -> dict[str
             "external_id": external_id,
             "pieces": len(result.pieces),
             "cleaned": result.cleaned,
+            "analyzed": result.analyzed,
+            "transcript_saved": result.transcript_saved,
+            "embedding_saved": result.embedding_saved,
             "error": result.error,
+            "analysis_error": result.analysis_error,
         }
 
 
-def _classify_one(item_id: int, taxonomy: Taxonomy, session_factory) -> dict[str, object]:
-    from save_finder.classify.fuse import classify_item
-    from save_finder.repositories.tags import add_item_tags
-
+def _classify_one(
+    item_id: int,
+    taxonomy: Taxonomy,
+    session_factory,
+    vision: VisionProvider | None = None,
+    llm: LLMProvider | None = None,
+) -> dict[str, object]:
     with session_scope(session_factory) as session:
         item = session.get(Item, item_id)
         if item is None:
             return {"item_id": item_id, "error": "item not found", "tags_emitted": 0}
 
-        result = classify_item(item, taxonomy)
-        if result.tags:
-            add_item_tags(
-                session,
-                item.id,
-                result.tags,
-                confidences=result.confidences,
-                source="auto",
-            )
+        result = classify_persisted_item(item, taxonomy, vision=vision, llm=llm)
+        inserted = replace_auto_tags(
+            session,
+            item.id,
+            result.tags,
+            confidences=result.confidences,
+            evidence=result.evidence,
+            taxonomy=taxonomy,
+        )
 
         item.status = ItemStatus.CLASSIFIED
+        item.classified_at = item.updated_at = utc_now_iso()
         session.commit()
         return {
             "item_id": item_id,
             "tags": list(result.tags),
-            "tags_emitted": len(result.tags),
+            "tags_emitted": inserted,
             "error": result.error,
         }
 
@@ -315,6 +327,8 @@ def _run_continuous_pipeline(
     shutdown_event: threading.Event | None = None,
 ) -> None:
     taxonomy = Taxonomy.load(settings.taxonomy_path)
+    vision = build_vision(settings)
+    llm = build_llm(settings)
     stages = ("enrich", "download", "classify")
     workers = max(1, settings.pipeline.max_concurrency)
 
@@ -326,7 +340,7 @@ def _run_continuous_pipeline(
                 ~Item.id.in_(select(MediaAsset.item_id)),
             )
             classify_query = select(Item.id).where(
-                Item.status == ItemStatus.ENRICHED,
+                Item.status.in_((ItemStatus.ENRICHED, ItemStatus.ANALYZED)),
                 Item.id.in_(select(MediaAsset.item_id)),
                 ~Item.id.in_(select(ItemTag.item_id)),
             )
@@ -392,7 +406,12 @@ def _run_continuous_pipeline(
                         )
                     else:
                         future = executors[stage].submit(
-                            _classify_one, item_id, taxonomy, session_factory
+                            _classify_one,
+                            item_id,
+                            taxonomy,
+                            session_factory,
+                            vision,
+                            llm,
                         )
                     futures[future] = (stage, item_id)
                     running[stage].add(item_id)
@@ -694,23 +713,42 @@ def pipeline_download(
 def pipeline_classify(
     request: Request,
     platform: Annotated[str | None, Form()] = None,
+    reclassify: Annotated[bool, Form()] = False,
 ) -> dict[str, object]:
     settings = _settings(request)
     taxonomy = Taxonomy.load(settings.taxonomy_path)
-    job_id = _start_job("classify", request.app.state.session_factory, platform=platform)
+    vision = build_vision(settings)
+    llm = build_llm(settings)
+    job_id = _start_job(
+        "classify",
+        request.app.state.session_factory,
+        platform=platform,
+        reclassify=reclassify,
+    )
 
     with session_scope(request.app.state.session_factory) as session:
-        query = select(Item.id).where(
-            Item.status == ItemStatus.ENRICHED,
-            Item.id.in_(select(MediaAsset.item_id)),
-            ~Item.id.in_(select(ItemTag.item_id)),
-        )
+        if reclassify:
+            query = select(Item.id).where(
+                Item.status.in_((ItemStatus.ENRICHED, ItemStatus.ANALYZED, ItemStatus.CLASSIFIED))
+            )
+        else:
+            query = select(Item.id).where(
+                Item.status.in_((ItemStatus.ENRICHED, ItemStatus.ANALYZED)),
+                Item.id.in_(select(MediaAsset.item_id)),
+                ~Item.id.in_(select(ItemTag.item_id)),
+            )
         if platform is not None:
             query = query.where(Item.platform == platform)
         item_ids = list(session.scalars(query.order_by(Item.id)).all())
 
     def _worker(item_id: int) -> dict[str, object]:
-        return _classify_one(item_id, taxonomy, request.app.state.session_factory)
+        return _classify_one(
+            item_id,
+            taxonomy,
+            request.app.state.session_factory,
+            vision,
+            llm,
+        )
 
     def _run() -> None:
         _run_items_job(request, job_id, item_ids, _worker, count_key="tags_emitted")

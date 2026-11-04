@@ -66,6 +66,7 @@ export oficial → adapter → import → enrich → download temporário → an
 | D17 | MVP é web para computador | Evita construir autenticação e transporte antes do produto estar de pé |
 | D18 | Limiares com padrões iniciais, calibrados na Fase 4 | Permite codar antes da amostra rotulada existir, sem congelar números no chute |
 | D19 | Importação aceita o ZIP oficial e upload por arrastar na web | É o formato real da exportação; evita descompactação manual e mantém curtidas e comentários fora |
+| D20 | Texto decide quando há fala/caption; visão entra quando não há texto ou o LLM não encontra categoria | Mantém as específicas no texto e usa o visual para o caso típico de imagem/carrossel; evita que um frame isolado sobreponha a fala |
 
 A preparação para multi-dispositivo se limita a: API JSON separada da UI, camada de dados portável e providers desacoplados. Acesso remoto e autenticação de usuário único entram quando o uso em celular justificar; nada de workspace ou multi-tenancy.
 
@@ -138,6 +139,8 @@ Aceite: após qualquer execução, inclusive com falha forçada, o diretório te
 ### 6.4 Classificação
 
 Sinais: transcrição, caption, frames e imagens. O texto tem peso maior quando há fala; o visual assume quando não há — o caso típico de imagem e carrossel sem áudio. A saída é multi-label, limitada às tags da taxonomia, com confiança e evidência gravadas.
+
+O LLM recebe caption + transcrição e devolve uma ampla e específicas daquela ampla, validado contra a taxonomia. O visual compara o embedding do item com as descrições em inglês das amplas; ele decide a ampla, mas não inventa específicas. Quando os dois concordam na ampla, as específicas do texto são mantidas. Resposta inválida do LLM cai para a heurística determinística.
 
 Limiares nascem com padrões iniciais e são calibrados sobre a amostra rotulada da Fase 4; não ficam presos a números escolhidos no chute. Reclassificar usa apenas transcrição e embedding já persistidos, sem rede.
 

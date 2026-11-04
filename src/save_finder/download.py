@@ -6,7 +6,7 @@ import logging
 import random
 import shutil
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -15,9 +15,10 @@ from sqlalchemy.orm import Session
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
+from save_finder.analysis import analyze_item
 from save_finder.config import Settings
 from save_finder.errors import DownloadError as DomainDownloadError
-from save_finder.models import Item, MediaAsset, MediaKind, utc_now_iso
+from save_finder.models import Item, ItemStatus, MediaAsset, MediaKind, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,10 @@ class DownloadResult:
     pieces: tuple[PieceInfo, ...]
     cleaned: bool = False
     error: str | None = None
+    analyzed: bool = False
+    transcript_saved: bool = False
+    embedding_saved: bool = False
+    analysis_error: str | None = None
 
 
 class WorkspaceGuard:
@@ -88,12 +93,16 @@ def download_item(
     *,
     adapter_factory: Any | None = None,
     timeout: int | None = None,
+    analyze: bool = True,
+    asr: object | None = None,
+    vision: object | None = None,
 ) -> DownloadResult:
-    """Download all pieces of one item into a temporary workspace.
+    """Download all pieces of one item and analyze them before cleanup.
 
     Video pieces are downloaded with ``yt-dlp``; image/carousel pieces use
-    the best thumbnail URL from ``yt-dlp`` info. The workspace is removed
-    in ``finally``; if it is missing at exit, the batch reports it.
+    the best thumbnail URL from ``yt-dlp`` info. Analysis (transcription and
+    visual embeddings) runs while the workspace still exists. The workspace
+    is removed in ``finally``; if it is missing at exit, the batch reports it.
     """
     timeout = timeout or settings.pipeline.download_timeout
     workspace = settings.paths.tmp / f"{item.platform}-{item.external_id}"
@@ -140,11 +149,39 @@ def download_item(
                             )
                         )
                 session.commit()
+
+            analyzed = False
+            transcript_saved = False
+            embedding_saved = False
+            analysis_error: str | None = None
+            if analyze and session is not None:
+                try:
+                    providers: dict[str, object] = {}
+                    if asr is not None:
+                        providers["asr"] = asr
+                    if vision is not None:
+                        providers["vision"] = vision
+                    analysis = analyze_item(ws, item, session, settings, **providers)
+                    analyzed = True
+                    transcript_saved = analysis.transcript_saved
+                    embedding_saved = analysis.embedding_saved
+                    analysis_error = analysis.error
+                    item.status = ItemStatus.ANALYZED
+                    item.updated_at = utc_now_iso()
+                    session.commit()
+                except Exception as exc:
+                    analysis_error = f"analysis failed: {exc.__class__.__name__}: {exc}"
+                    logger.exception("analysis failed item=%s", item.external_id)
+
             result = DownloadResult(
                 item_id=item_id,
                 workspace=ws,
                 pieces=pieces,
                 cleaned=False,
+                analyzed=analyzed,
+                transcript_saved=transcript_saved,
+                embedding_saved=embedding_saved,
+                analysis_error=analysis_error,
             )
     except DomainDownloadError as exc:
         logger.warning("download failed item=%s: %s", item.external_id, exc)
@@ -171,23 +208,11 @@ def download_item(
         if workspace.exists():
             try:
                 shutil.rmtree(workspace)
-                result = DownloadResult(
-                    item_id=result.item_id,
-                    workspace=result.workspace,
-                    pieces=result.pieces,
-                    cleaned=True,
-                    error=result.error,
-                )
+                result = replace(result, cleaned=True)
             except OSError as exc:
                 logger.error("cleanup failed for %s: %s", workspace, exc)
         else:
-            result = DownloadResult(
-                item_id=result.item_id,
-                workspace=result.workspace,
-                pieces=result.pieces,
-                cleaned=True,
-                error=result.error,
-            )
+            result = replace(result, cleaned=True)
 
     # Final verification for the batch
     _check_tmp_empty(settings)

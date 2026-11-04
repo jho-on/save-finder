@@ -31,8 +31,19 @@ python3 -m venv .venv
 Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão:
 
 ```bash
-.venv/bin/python -m pip install -e ".[asr,vision,llm]"  
+.venv/bin/python -m pip install -e ".[asr,vision,llm]"
 ```
+
+O classificador usa três provedores locais, configurados em `config/settings.toml`:
+
+- **ASR** — `faster-whisper` transcreve o áudio com detecção automática de idioma.
+- **Visão** — `open-clip` gera o embedding das imagens/frames e das descrições das tags.
+- **LLM** — `ollama` classifica caption + transcrição dentro da taxonomia fechada.
+
+O padrão do LLM é `qwen3:8b`, com `think=false` e resposta limitada a 256 tokens
+para manter a classificação rápida em CPU. Se ele ainda não estiver no cache local,
+rode `ollama pull qwen3:8b`. Sem os extras instalados a classificação cai na heurística
+conservadora de palavras-chave, e o erro do provedor aparece no relatório.
 
 ## Configuração
 
@@ -75,11 +86,17 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 # tenta de novo somente os itens que ficaram com status `error`
 .venv/bin/save-finder enrich --retry-errors --limit 10
 
-# download das peças, áudio, keyframe e thumbnail definitiva
+# download das peças, áudio, keyframe, thumbnail e análise (transcrição/embedding)
 .venv/bin/save-finder download --limit 3
+
+# apenas baixar, sem carregar modelos de IA
+.venv/bin/save-finder download --limit 3 --no-analyze
 
 # classificação automática pelas tags da taxonomia
 .venv/bin/save-finder classify --limit 30
+
+# reclassificar do banco, sem baixar mídia nem acessar a rede
+.venv/bin/save-finder classify --reclassify --limit 30
 
 # contagens por status e plataforma
 .venv/bin/save-finder stats
@@ -95,6 +112,12 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 thumbnail. A imagem de capa vai para `data/thumbs/`; nenhuma URL de CDN é persistida.
 Posts privados, removidos ou bloqueados ficam como `unavailable`; falhas nossas ficam como
 `error`. Reexecutar o comando pega apenas os itens ainda pendentes.
+
+`download` roda a análise antes de apagar o workspace: transcreve o áudio, gera um
+embedding agregado por item e grava ambos no banco. A mídia original continua sendo
+removida em `finally`. `classify` usa os sinais persistidos e grava tags com confiança
+e evidência; `--reclassify` substitui apenas tags automáticas antigas e preserva
+correções manuais.
 
 A API expõe `GET /api/health`, listagem/busca em `/api/items`, execução do pipeline em
 `POST /api/pipeline/*` e acompanhamento dos jobs. A referência completa está em

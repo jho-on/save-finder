@@ -14,7 +14,7 @@ from rich.table import Table
 from sqlalchemy.orm import Session
 
 from save_finder import __version__
-from save_finder.classify.fuse import classify_item
+from save_finder.classify.fuse import classify_persisted_item
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, ensure_directories, load_settings
 from save_finder.db import make_engine, make_session_factory, session_scope, upgrade_database
@@ -23,8 +23,9 @@ from save_finder.enrich import enrich_items
 from save_finder.errors import ConfigError, SaveFinderError
 from save_finder.importer import import_export
 from save_finder.platforms.registry import get_adapter
+from save_finder.providers.factory import build_llm, build_vision
 from save_finder.repositories.items import database_stats
-from save_finder.repositories.tags import sync_taxonomy
+from save_finder.repositories.tags import replace_auto_tags, sync_taxonomy
 
 app = typer.Typer(
     help="Local library and classifier for media saved on social networks.",
@@ -254,8 +255,15 @@ def download_command(
     platform: Annotated[
         str | None, typer.Option(help="Only download items from this platform.")
     ] = None,
+    analyze: Annotated[
+        bool,
+        typer.Option(
+            "--analyze/--no-analyze",
+            help="Transcribe audio and persist visual embeddings before cleanup.",
+        ),
+    ] = True,
 ) -> None:
-    """Download media pieces for enriched items (Fase 3)."""
+    """Download media pieces and analyze them (Fase 3/4)."""
     settings = _settings()
     ensure_directories(settings)
     try:
@@ -272,20 +280,29 @@ def download_command(
             results = []
             for item in items:
                 res = download_item(
-                    item, session, settings, timeout=settings.pipeline.download_timeout
+                    item,
+                    session,
+                    settings,
+                    timeout=settings.pipeline.download_timeout,
+                    analyze=analyze,
                 )
-                results.append((item.external_id, res.pieces, res.cleaned, res.error))
-            table = Table(title="Download (Fase 3)")
+                results.append(res)
+            table = Table(title="Download and analysis")
             table.add_column("Item")
             table.add_column("Pieces")
             table.add_column("Clean")
-            table.add_column("Error")
-            for ext, pieces, cleaned, err in results:
+            table.add_column("Transcript")
+            table.add_column("Embedding")
+            table.add_column("Error", overflow="fold")
+            for res in results:
+                item = session.get(Item, res.item_id)
                 table.add_row(
-                    ext,
-                    str(len(pieces)),
-                    "yes" if cleaned else "no",
-                    err or "",
+                    item.external_id if item is not None else str(res.item_id),
+                    str(len(res.pieces)),
+                    "yes" if res.cleaned else "no",
+                    "yes" if res.transcript_saved else "no",
+                    "yes" if res.embedding_saved else "no",
+                    res.error or res.analysis_error or "",
                 )
             console.print(table)
     except SaveFinderError as exc:
@@ -299,45 +316,61 @@ def classify_command(
     platform: Annotated[
         str | None, typer.Option(help="Only classify items from this platform.")
     ] = None,
+    reclassify: Annotated[
+        bool,
+        typer.Option(
+            "--reclassify",
+            help="Re-run classification from persisted transcript/embedding.",
+        ),
+    ] = False,
 ) -> None:
-    """Classify enriched items with taxonomy tags (Fase 4)."""
+    """Classify items with AI signals and the closed taxonomy (Fase 4)."""
     settings = _settings()
     ensure_directories(settings)
     try:
         taxonomy = Taxonomy.load(settings.taxonomy_path)
+        vision = build_vision(settings)
+        llm = build_llm(settings)
         with _session_scope(settings) as session:
             from sqlalchemy import select
 
-            from save_finder.models import Item, ItemStatus, ItemTag, MediaAsset
+            from save_finder.models import Item, ItemStatus, ItemTag, MediaAsset, utc_now_iso
 
-            query = select(Item).where(Item.status == "enriched")
+            query = select(Item).where(Item.status.in_((ItemStatus.ENRICHED, ItemStatus.ANALYZED)))
             if platform is not None:
                 query = query.where(Item.platform == platform)
-            # Apenas itens baixados (possuem media assets) e não já tagueados
-            query = query.where(Item.id.in_(select(MediaAsset.item_id)))
-            query = query.where(~Item.id.in_(select(ItemTag.item_id)))
-            items = session.scalars(query.limit(limit)).all()
+            if reclassify:
+                query = select(Item).where(
+                    Item.status.in_(
+                        (ItemStatus.ENRICHED, ItemStatus.ANALYZED, ItemStatus.CLASSIFIED)
+                    )
+                )
+                if platform is not None:
+                    query = query.where(Item.platform == platform)
+            else:
+                # Only downloaded items that do not have tags yet.
+                query = query.where(Item.id.in_(select(MediaAsset.item_id)))
+                query = query.where(~Item.id.in_(select(ItemTag.item_id)))
+            items = session.scalars(query.order_by(Item.id).limit(limit)).all()
             table = Table(title="Classification (Fase 4)")
             table.add_column("Item")
             table.add_column("Tags")
-            table.add_column("Evidence")
-            table.add_column("Error")
+            table.add_column("Evidence", overflow="fold")
+            table.add_column("Error", overflow="fold")
             total_tags = 0
             for item in items:
-                result = classify_item(item, taxonomy)
-                if result.tags:
-                    from save_finder.repositories.tags import add_item_tags
-
-                    add_item_tags(
-                        session,
-                        item.id,
-                        result.tags,
-                        confidences=result.confidences,
-                        source="auto",
-                    )
-                    session.commit()
-                    total_tags += len(result.tags)
+                result = classify_persisted_item(item, taxonomy, vision=vision, llm=llm)
+                inserted = replace_auto_tags(
+                    session,
+                    item.id,
+                    result.tags,
+                    confidences=result.confidences,
+                    evidence=result.evidence,
+                    taxonomy=taxonomy,
+                )
+                total_tags += inserted
                 item.status = ItemStatus.CLASSIFIED
+                item.classified_at = item.updated_at = utc_now_iso()
                 session.commit()
                 table.add_row(
                     item.external_id,

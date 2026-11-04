@@ -111,11 +111,15 @@ Enriquece todos os itens `pending` (ou apenas de `platform`). Form field opciona
 
 ### `POST /api/pipeline/download`
 
-Baixa itens `enriched` que ainda não têm mídia registrada.
+Baixa itens `enriched` que ainda não têm mídia registrada e roda a análise antes de
+apagar o workspace: transcrição do áudio e embedding visual agregado. Os artefatos
+persistidos são `transcripts` e `embeddings`; a mídia original não sobrevive à etapa.
 
 ### `POST /api/pipeline/classify`
 
-Classifica itens `enriched` que já têm mídia e ainda não têm tags.
+Classifica itens `enriched`/`analyzed` que já têm mídia e ainda não têm tags. Form fields
+opcionais: `platform` e `reclassify=true`. Reclassificar usa apenas caption, transcrição e
+embedding do banco e substitui somente tags automáticas, preservando as manuais.
 
 ### `POST /api/pipeline/run`
 
@@ -146,7 +150,9 @@ Estado do job (`running`, `done`, `error`, `interrupted`), progresso, resultado 
 
 - Nenhum endpoint persiste mídia original. `thumb_path` é o único caminho de imagem servido localmente.
 - A busca atual usa `ilike`; FTS5 pode ser adicionada em `repositories/search.py` sem alterar a API.
-- A classificação atual usa a heurística de `classify/fuse.py`; provedores de IA podem substituí-la
-  sem alterar os contratos JSON.
+- A classificação usa LLM (`ollama`) para texto e CLIP (`open-clip`) para visão; sem os
+  provedores configurados, `classify/fuse.py` cai na heurística de palavras-chave sem
+  alterar os contratos JSON. Específicas só podem vir do texto, e o resultado sempre
+  respeita uma única tag ampla.
 - Os endpoints usam `app.state.settings`/`app.state.session_factory`, então respeitam o `Settings`
   injetado em `create_app` (incluindo bancos de teste).

@@ -40,14 +40,27 @@ max_files = 200
 [providers.asr]
 name = "faster-whisper"
 model = "small"
+device = "auto"
+compute_type = "int8"
 
 [providers.vision]
 name = "open-clip"
 model = "ViT-B-32"
+pretrained = "laion2b_s34b_b79k"
+device = "auto"
+batch_size = 8
 
 [providers.llm]
 name = "ollama"
-model = "llama3.1"
+model = "qwen3:8b"
+temperature = 0.0
+num_ctx = 8192
+# Keep the answer bounded; thinking is disabled so classification stays fast.
+num_predict = 256
+timeout = 90
+think = false
+keep_alive = "10m"
+json_mode = true
 
 [web]
 host = "127.0.0.1"
