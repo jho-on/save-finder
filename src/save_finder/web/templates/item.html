@@ -255,11 +255,12 @@
 			<header class="intro">
 				<a href="/library" class="back-link"> ← Biblioteca </a>
 
-				<h1>{{ item.external_id }}</h1>
+				<h1>{{ title }}</h1>
 
 				<p class="lede">
 					Plataforma: {{ item.platform }} · Tipo: {{ item.post_type or
-					'-' }} · Peças: {{ item.media_count }}
+					'-' }} · Peças: {{ item.media_count }} · ID: {{
+					item.external_id }}
 				</p>
 			</header>
 

@@ -72,6 +72,7 @@ def test_api_items_and_detail(client: TestClient, item: Item) -> None:
 
     detail = client.get(f"/api/items/{item.id}")
     assert detail.status_code == 200
+    assert detail.json()["title"] == "receitas de bolo"
     tags = {tag["slug"] for tag in detail.json()["tags"]}
     assert tags == {"comida-e-bebida", "receitas"}
     assert detail.json()["classification_method"] == "heuristic"
@@ -101,6 +102,12 @@ def test_item_exposes_ai_method_and_evidence(
     assert 'class="method-badge ai"' in page.text
     assert page.text.count("info-tip-popup") == 1
     assert "llm: receita de bolo caseiro" in page.text
+
+
+def test_display_title_uses_caption() -> None:
+    assert api.display_title("  Receita\ndo dia  ", "abc") == "Receita do dia"
+    assert api.display_title(None, "abc") == "abc"
+    assert api.display_title("", "abc") == "abc"
 
 
 def test_api_items_filter_by_tag(client: TestClient, item: Item) -> None:

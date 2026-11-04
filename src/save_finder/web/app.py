@@ -119,6 +119,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 (tag["evidence"] for tag in tag_list if tag["evidence"]),
                 None,
             )
+            title = web_api.display_title(item.caption, item.external_id)
 
         return templates.TemplateResponse(
             request=request,
@@ -126,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             context={
                 "app_name": settings.app_name,
                 "item": item,
+                "title": title,
                 "tags": tag_list,
                 "classification_method": method,
                 "classification_evidence": evidence,

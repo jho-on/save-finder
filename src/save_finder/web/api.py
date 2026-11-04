@@ -89,6 +89,20 @@ def classification_method(tags: Sequence[dict[str, object]]) -> str | None:
     return "heuristic"
 
 
+def display_title(caption: str | None, external_id: str, limit: int = 120) -> str:
+    """Return a human-readable title derived from the caption.
+
+    Posts do not have a title field, so the caption is the closest thing to a
+    name. Fall back to the external id when the caption is empty.
+    """
+    text = " ".join((caption or "").split())
+    if not text:
+        return external_id
+    if len(text) > limit:
+        text = text[: limit - 1].rstrip() + "…"
+    return text
+
+
 def _item_to_dict(item: Item, tags: Sequence[dict[str, object]] | None = None) -> dict[str, object]:
     thumb = item.thumb_path or None
     if thumb is not None and thumb.startswith("http"):
@@ -98,6 +112,7 @@ def _item_to_dict(item: Item, tags: Sequence[dict[str, object]] | None = None) -
         "id": item.id,
         "platform": item.platform,
         "external_id": item.external_id,
+        "title": display_title(item.caption, item.external_id),
         "url": item.url,
         "author": item.author,
         "caption": item.caption,
