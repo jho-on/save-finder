@@ -7,10 +7,14 @@
 				if (s) document.documentElement.setAttribute("data-theme", s);
 			})();
 		</script>
+
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
 		<title>Tag — {{ app_name }}</title>
+
 		<link rel="stylesheet" href="/static/style.css" />
+
 		<style>
 			:root,
 			[data-theme="light"] {
@@ -20,7 +24,11 @@
 				--error: #ff0044;
 				--surface: #ffffff;
 				--border: #000000;
+
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
 			}
+
 			[data-theme="dark"] {
 				--bg: #000000;
 				--fg: #ffffff;
@@ -28,86 +36,496 @@
 				--error: #ff0044;
 				--surface: #000000;
 				--border: #ffffff;
+
+				--brand-yellow: #fee761;
+				--brand-pink: #ff0044;
 			}
+
 			body {
+				margin: 0;
 				background: var(--bg);
 				color: var(--fg);
 				font-family: system-ui, sans-serif;
-				margin: 0;
 			}
+
 			.shell {
 				max-width: 1200px;
 				margin: 0 auto;
 				padding: 2rem 1rem;
 			}
-			.card {
-				background: var(--surface);
-				border: 2px solid var(--border);
-				border-radius: 8px;
-				padding: 1rem;
+
+			h1,
+			h2,
+			h3 {
+				color: var(--fg);
+				letter-spacing: -0.02em;
 			}
+
+			a {
+				color: var(--fg);
+			}
+
+			.intro a {
+				font-weight: 700;
+				text-decoration: underline;
+				text-decoration-color: var(--brand-pink);
+				text-decoration-thickness: 2px;
+				text-underline-offset: 3px;
+			}
+
+			.intro a:hover {
+				text-decoration-color: var(--brand-yellow);
+			}
+
+			.lede {
+				color: var(--fg);
+				line-height: 1.6;
+			}
+
+			.search-row {
+				position: sticky;
+				top: var(--nav-height, 60px);
+				z-index: 10;
+				padding: 0.75rem 0;
+				margin-bottom: 0.75rem;
+				background: var(--bg);
+				border-bottom: 2px solid var(--border);
+			}
+
+			.search-form {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+
+			.search-form input {
+				box-sizing: border-box;
+				min-width: 0;
+				flex: 1;
+				width: 60%;
+				padding: 0.6rem 0.75rem;
+				border: 2px solid var(--border);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+				font-family: inherit;
+				font-size: 1rem;
+			}
+
+			.search-form input::placeholder {
+				color: var(--fg);
+			}
+
+			.search-form button {
+				flex: 0 0 auto;
+				width: auto;
+				padding: 0.5rem 1rem;
+				border: 2px solid var(--fg);
+				border-radius: 4px;
+				background: var(--fg);
+				color: var(--bg);
+				font: inherit;
+				font-weight: 700;
+				cursor: pointer;
+				transition:
+					background 0.15s,
+					color 0.15s,
+					border-color 0.15s;
+			}
+
+			.search-form button:hover {
+				background: var(--brand-yellow);
+				border-color: var(--brand-yellow);
+				color: #000000;
+			}
+
+			.search-form input:focus-visible,
+			.search-form button:focus-visible,
+			.filter-chip:focus-visible {
+				outline: 3px solid var(--brand-pink);
+				outline-offset: 3px;
+			}
+
+			.tag-filters {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 0.4rem;
+				margin: 0 0 1rem;
+			}
+
+			.tag-filters-label {
+				margin-right: 0.15rem;
+				font-size: 0.75rem;
+				font-weight: 800;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+			}
+
+			.filter-chip {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				width: auto;
+				padding: 0.3rem 0.6rem;
+				border: 2px solid var(--border);
+				border-radius: 999px;
+				background: var(--surface);
+				color: var(--fg);
+				font: inherit;
+				font-size: 0.78rem;
+				font-weight: 700;
+				line-height: 1.4;
+				cursor: pointer;
+				transition:
+					background 0.15s,
+					color 0.15s,
+					border-color 0.15s;
+			}
+
+			.filter-chip:hover {
+				border-color: var(--brand-yellow);
+				background: var(--brand-yellow);
+				color: #000000;
+			}
+
+			.filter-chip.is-active {
+				border-color: var(--fg);
+				background: var(--fg);
+				color: var(--bg);
+			}
+
+			.filter-count {
+				font-size: 0.68rem;
+				font-weight: 800;
+				opacity: 0.7;
+			}
+
 			.grid {
 				display: grid;
-				grid-template-columns: repeat(3, 1fr);
+				grid-template-columns: repeat(3, minmax(0, 1fr));
 				gap: 1rem;
 			}
+
+			.grid > a {
+				display: block;
+				color: var(--fg);
+				text-decoration: none;
+			}
+
+			.card {
+				box-sizing: border-box;
+				height: 100%;
+				padding: 1rem;
+				background: var(--surface);
+				color: var(--fg);
+				border: 2px solid var(--border);
+				border-top: 2px solid var(--brand-yellow);
+				border-image: linear-gradient(
+						to right,
+						var(--brand-yellow) 0 50%,
+						var(--brand-pink) 50% 100%
+					)
+					1;
+				border-radius: 4px;
+				transition:
+					transform 0.15s,
+					border-color 0.15s;
+			}
+
+			.grid > a:hover .card {
+				transform: translateY(-3px);
+				border-bottom-color: var(--brand-pink);
+			}
+
+			.grid .card img {
+				display: block;
+				box-sizing: border-box;
+				width: 100%;
+				aspect-ratio: 3 / 4;
+				object-fit: cover;
+				border-radius: 3px;
+			}
+
+			.grid .card h3 {
+				display: -webkit-box;
+				margin: 0.75rem 0 0;
+				overflow: hidden;
+				color: var(--fg);
+				overflow-wrap: anywhere;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+			}
+
+			.item-description {
+				display: -webkit-box;
+				margin: 0.35rem 0;
+				overflow: hidden;
+				color: var(--fg);
+				font-size: 0.9rem;
+				overflow-wrap: anywhere;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+			}
+
+			.item-metadata {
+				margin: 0.35rem 0;
+				color: var(--fg);
+				font-size: 0.85rem;
+				line-height: 1.5;
+			}
+
+			.status-badge {
+				display: inline-block;
+				padding: 0.1rem 0.4rem;
+				border-radius: 3px;
+				background: var(--fg);
+				color: var(--bg);
+				font-weight: 700;
+			}
+
+			.status-badge.enriched {
+				background: var(--brand-yellow);
+				color: #000000;
+			}
+
+			.status-badge.error {
+				background: var(--brand-pink);
+				color: #000000;
+			}
+
+			.error-box {
+				padding: 0.75rem 1rem;
+				border: 2px solid var(--brand-pink);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+			}
+
+			.sticky-bottom {
+				position: sticky;
+				bottom: 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				padding: 0.75rem 1rem;
+				margin-top: 1rem;
+				background: var(--bg);
+				border-top: 2px solid var(--border);
+			}
+
+			.sticky-bottom button {
+				display: inline-flex;
+				align-items: center;
+				flex: 0 0 auto;
+				width: auto;
+				min-width: 0;
+				gap: 0.25rem;
+				padding: 0.5rem 0.65rem;
+				border: 1px solid var(--border);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+				font: inherit;
+				font-size: 0.85rem;
+				cursor: pointer;
+			}
+
+			.sticky-bottom button:hover:not(:disabled) {
+				background: var(--brand-pink);
+				border-color: var(--brand-pink);
+				color: #000000;
+			}
+
+			.sticky-bottom button:disabled {
+				cursor: not-allowed;
+				border-style: dashed;
+			}
+
+			#page-info {
+				margin: 0;
+				color: var(--fg);
+				font-size: 0.9rem;
+				font-variant-numeric: tabular-nums;
+				text-align: center;
+			}
+
 			@media (max-width: 900px) {
 				.grid {
-					grid-template-columns: repeat(2, 1fr);
+					grid-template-columns: repeat(2, minmax(0, 1fr));
 				}
 			}
+
 			@media (max-width: 600px) {
+				.shell {
+					padding: 1.25rem 0.75rem;
+				}
+
 				.grid {
 					grid-template-columns: 1fr;
+				}
+
+				.sticky-bottom {
+					padding: 0.75rem 0;
+				}
+
+				#page-info {
+					font-size: 0.8rem;
 				}
 			}
 		</style>
 	</head>
+
 	<body>
 		{% include 'nav.html' %}
+
 		<main class="shell">
 			<header class="intro">
 				<p class="eyebrow">
-					<a href="/library" style="color: var(--accent)"
-						>← Biblioteca</a
-					>
-					· <a href="/tags" style="color: var(--accent)">Tags</a>
+					<a href="/library">← Biblioteca</a> ·
+					<a href="/tags">Tags</a>
 				</p>
+
 				<h1>Tag: {{ tag_name }}</h1>
-				<p class="lede" style="color: var(--fg); opacity: 0.85">
+
+				<p class="lede">
 					{{ tag_slug }} — {{ count }} itens
 				</p>
 			</header>
 
 			<section class="library">
+				<div class="search-row">
+					<form
+						class="search-form"
+						onsubmit="
+							event.preventDefault();
+							currentSearch = this.q.value.trim();
+							currentOffset = 0;
+							hxt(buildUrl(0));
+							return false;
+						"
+					>
+						<input
+							name="q"
+							type="text"
+							placeholder="Buscar nesta tag..."
+							aria-label="Buscar nesta tag"
+						/>
+						<button type="submit">Buscar</button>
+					</form>
+				</div>
+
+				{% if tag_filters %}
+				<div
+					class="tag-filters"
+					role="group"
+					aria-label="Filtrar por tag específica"
+				>
+					<span class="tag-filters-label">Filtrar:</span>
+
+					<button
+						type="button"
+						class="filter-chip{% if broad_slug == tag_slug %} is-active{% endif %}"
+						data-tag="{{ broad_slug }}"
+						onclick="selectFilter(this)"
+					>
+						{{ broad_name }}
+						<span class="filter-count">{{ broad_count }}</span>
+					</button>
+
+					{% for filter in tag_filters %}
+					<button
+						type="button"
+						class="filter-chip{% if filter.slug == tag_slug %} is-active{% endif %}"
+						data-tag="{{ filter.slug }}"
+						onclick="selectFilter(this)"
+					>
+						{{ filter.name }}
+						<span class="filter-count">{{ filter.count }}</span>
+					</button>
+					{% endfor %}
+				</div>
+				{% endif %}
+
 				<div id="items">
 					<p>Carregando...</p>
 				</div>
+
 				{% include "pagination.html" %}
 			</section>
 		</main>
 
 		<script>
-			(function () {
-				const s = localStorage.getItem("savefinder-theme");
-				if (s) document.documentElement.setAttribute("data-theme", s);
-			})();
-
 			function toggleTheme() {
 				const html = document.documentElement;
-				const n =
-					html.getAttribute("data-theme") === "dark"
-						? "light"
-						: "dark";
+				const current = html.getAttribute("data-theme") || "light";
+				const next = current === "dark" ? "light" : "dark";
 
-				html.setAttribute("data-theme", n);
-				localStorage.setItem("savefinder-theme", n);
+				html.setAttribute("data-theme", next);
+				localStorage.setItem("savefinder-theme", next);
 			}
 
+			const initialTag = {{ tag_slug|tojson }};
+
 			let currentOffset = 0;
-			const limit = 20;
+			const limit = 21;
+			let totalItems = 0;
 			let totalPages = 1;
-			const slug = "{{ tag_slug }}";
+			let currentSearch = "";
+			let currentTag = initialTag;
+
+			function escapeHtml(value) {
+				return String(value ?? "").replace(
+					/[&<>"']/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+							"'": "&#39;",
+						})[c],
+				);
+			}
+
+			const methodLabels = {
+				ai: "IA",
+				heuristic: "Heurística",
+				manual: "Manual",
+			};
+
+			function buildUrl(offset) {
+				const params = new URLSearchParams({
+					limit: String(limit),
+					offset: String(offset),
+					tag: currentTag,
+				});
+
+				if (currentSearch) {
+					return (
+						"/api/items/search?q=" +
+						encodeURIComponent(currentSearch) +
+						"&" +
+						params.toString()
+					);
+				}
+
+				return "/api/items?" + params.toString();
+			}
+
+			function selectFilter(button) {
+				currentTag = button.dataset.tag;
+				currentOffset = 0;
+
+				document.querySelectorAll(".filter-chip").forEach((chip) => {
+					chip.classList.toggle("is-active", chip === button);
+				});
+
+				hxt(buildUrl(0));
+			}
 
 			function hxt(url) {
 				fetch(url)
@@ -126,16 +544,17 @@
 								true;
 
 							currentOffset = 0;
+							totalItems = 0;
 							totalPages = 1;
 							return;
 						}
 
 						currentOffset = d.offset || 0;
+						totalItems = d.total || 0;
 
-						const total = d.total || 0;
 						const page = Math.floor(currentOffset / limit) + 1;
 
-						totalPages = Math.ceil(total / limit) || 1;
+						totalPages = Math.ceil(totalItems / limit) || 1;
 
 						document.getElementById("page-info").textContent =
 							"Página " +
@@ -143,13 +562,13 @@
 							" de " +
 							totalPages +
 							" (" +
-							total +
+							totalItems +
 							" itens)";
 
 						document.getElementById("prev-button").disabled =
-							page <= 1;
+							currentOffset <= 0;
 						document.getElementById("next-button").disabled =
-							page >= totalPages;
+							currentOffset + limit >= totalItems;
 
 						c.innerHTML =
 							'<div class="grid">' +
@@ -159,42 +578,87 @@
 										? "/data/" + i.thumb_path
 										: "";
 
-									const tags =
-										(i.tags || [])
-											.map((t) => t.slug)
-											.join(", ") || "-";
+									const tagItems = i.tags || [];
+									const tags = tagItems.length
+										? tagItems
+												.map((t) =>
+													escapeHtml(t.slug),
+												)
+												.join(", ")
+										: "-";
+
+									const method = i.classification_method;
+									const methodBadge = method
+										? '<span class="method-badge ' +
+											escapeHtml(method) +
+											'">' +
+											escapeHtml(
+												methodLabels[method] ||
+													method,
+											) +
+											"</span>"
+										: "";
+
+									const evidence = tagItems
+										.map((t) => t.evidence)
+										.find(Boolean);
+
+									const evidenceTip = evidence
+										? '<span class="info-tip" tabindex="0" onclick="event.preventDefault(); event.stopPropagation();">' +
+											'<span class="info-tip-button" aria-hidden="true">i</span>' +
+											'<span class="info-tip-popup" role="tooltip">' +
+											escapeHtml(evidence) +
+											"</span></span>"
+										: "";
+
+									const classification =
+										methodBadge || evidenceTip
+											? " | " +
+												methodBadge +
+												(methodBadge && evidenceTip
+													? " "
+													: "") +
+												evidenceTip
+											: "";
+
+									const statusClass =
+										i.status === "error"
+											? "error"
+											: i.status === "enriched"
+												? "enriched"
+												: "";
 
 									return (
 										'<a href="/item/' +
 										i.id +
-										'" style="text-decoration:none;color:inherit;"><article class="card" style="cursor:pointer;">' +
+										'"><article class="card">' +
 										(thumb
 											? '<img src="' +
 												thumb +
-												'" alt="" loading="lazy" style="max-width:100%;border-radius:4px;border:2px solid var(--border);"/>'
+												'" alt="" loading="lazy" />'
 											: "") +
-										'<h3 style="color:var(--fg);margin:.25rem 0;">' +
-										(i.title || i.external_id || "") +
+										"<h3>" +
+										escapeHtml(
+											i.title || i.external_id || "",
+										) +
 										"</h3>" +
-										'<p style="margin:.25rem 0;color:var(--fg);font-size:.85rem;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' +
-										(i.author || "") +
+										'<p class="item-description">' +
+										escapeHtml(i.author || "") +
 										"</p>" +
-										'<p style="margin:.25rem 0;color:var(--fg);font-size:.85rem;"><strong>Tipo:</strong> ' +
+										'<p class="item-metadata"><strong>Tipo:</strong> ' +
 										(i.post_type || "-") +
 										" | <strong>Peças:</strong> " +
 										(i.media_count || 0) +
 										"</p>" +
-										'<p style="margin:.25rem 0;color:var(--fg);font-size:.85rem;"><strong>Tags:</strong> ' +
+										'<p class="item-metadata"><strong>Tags:</strong> ' +
 										tags +
-										' | <strong>Status:</strong> <span style="color:' +
-										(i.status === "error"
-											? "var(--error)"
-											: i.status === "enriched"
-												? "var(--accent)"
-												: "var(--fg)") +
+										' | <strong>Status:</strong> <span class="status-badge ' +
+										statusClass +
 										'">' +
 										(i.status || "-") +
-										"</span></p>" +
+										"</span>" +
+										classification +
+										"</p>" +
 										"</article></a>"
 									);
 								})
@@ -203,42 +667,25 @@
 					})
 					.catch(() => {
 						document.getElementById("items").innerHTML =
-							'<p style="color:var(--fg)">Erro ao carregar biblioteca.</p>';
+							'<p class="error-box">Erro ao carregar biblioteca.</p>';
 					});
 			}
 
 			function prevPage() {
 				if (currentOffset >= limit) {
-					hxt(
-						"/api/items?limit=" +
-							limit +
-							"&offset=" +
-							(currentOffset - limit) +
-							"&tag=" +
-							encodeURIComponent(slug),
-					);
+					hxt(buildUrl(currentOffset - limit));
 				}
 			}
 
 			function nextPage() {
-				if (currentOffset + limit < totalPages * limit) {
-					hxt(
-						"/api/items?limit=" +
-							limit +
-							"&offset=" +
-							(currentOffset + limit) +
-							"&tag=" +
-							encodeURIComponent(slug),
-					);
+				const nextOffset = currentOffset + limit;
+
+				if (nextOffset < totalItems) {
+					hxt(buildUrl(nextOffset));
 				}
 			}
 
-			hxt(
-				"/api/items?limit=" +
-					limit +
-					"&offset=0&tag=" +
-					encodeURIComponent(slug),
-			);
+			hxt(buildUrl(0));
 		</script>
 	</body>
 </html>

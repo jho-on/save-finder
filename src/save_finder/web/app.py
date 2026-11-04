@@ -197,6 +197,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 or 0
             )
 
+            broad = tag if tag.parent_id is None else session.get(Tag, tag.parent_id)
+            broad_slug = broad.slug if broad is not None else tag.slug
+            broad_name = broad.name if broad is not None else tag.name
+            broad_count = (
+                session.execute(
+                    select(func.count())
+                    .select_from(ItemTag)
+                    .join(Tag, Tag.id == ItemTag.tag_id)
+                    .where(Tag.slug == broad_slug)
+                ).scalar()
+                or 0
+            )
+
+            parent_for_filters = tag.id if tag.parent_id is None else tag.parent_id
+            filter_rows = session.execute(
+                select(Tag, func.count(ItemTag.item_id))
+                .join(ItemTag, ItemTag.tag_id == Tag.id)
+                .where(Tag.parent_id == parent_for_filters)
+                .group_by(Tag.id)
+                .order_by(Tag.name)
+            ).all()
+            tag_filters = [
+                {"slug": specific.slug, "name": specific.name, "count": specific_count}
+                for specific, specific_count in filter_rows
+            ]
+
         return templates.TemplateResponse(
             request=request,
             name="tag.html",
@@ -205,6 +231,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "tag_name": tag.name,
                 "tag_slug": tag.slug,
                 "count": count,
+                "broad_slug": broad_slug,
+                "broad_name": broad_name,
+                "broad_count": broad_count,
+                "tag_filters": tag_filters,
                 "page": "tag",
             },
         )

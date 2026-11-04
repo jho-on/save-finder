@@ -193,6 +193,7 @@ def search_items(
     request: Request,
     q: Annotated[str, Query(min_length=1)],
     status: Annotated[str | None, Query()] = None,
+    tag: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict[str, object]:
@@ -208,6 +209,11 @@ def search_items(
                 query = query.where(Item.status == ItemStatus(status))
             except ValueError:
                 raise HTTPException(status_code=400, detail=f"invalid status: {status}") from None
+        if tag is not None:
+            tag_id = session.scalar(select(Tag.id).where(Tag.slug == tag))
+            if tag_id is None:
+                return {"query": q, "items": [], "total": 0, "limit": limit, "offset": offset}
+            query = query.join(ItemTag, Item.id == ItemTag.item_id).where(ItemTag.tag_id == tag_id)
 
         total = session.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
         rows = session.scalars(query.order_by(Item.id.desc()).offset(offset).limit(limit)).all()

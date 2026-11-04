@@ -133,6 +133,24 @@ def test_api_search(client: TestClient, item: Item) -> None:
     assert data["items"][0]["id"] == item.id
 
 
+def test_api_search_filters_by_tag(client: TestClient, item: Item) -> None:
+    matching = client.get("/api/items/search?q=bolo&tag=receitas")
+    assert matching.status_code == 200
+    assert matching.json()["total"] == 1
+
+    other = client.get("/api/items/search?q=bolo&tag=tecnologia")
+    assert other.status_code == 200
+    assert other.json()["total"] == 0
+
+
+def test_tag_page_lists_specific_filters(client: TestClient, item: Item) -> None:
+    response = client.get("/tag/comida-e-bebida")
+    assert response.status_code == 200
+    assert 'data-tag="comida-e-bebida"' in response.text
+    assert 'data-tag="receitas"' in response.text
+    assert "Receitas" in response.text
+
+
 def test_pipeline_start_and_status(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(api, "_start_background_task", lambda *args, **kwargs: None)
     response = client.post("/api/pipeline/enrich", data={"platform": "instagram"})

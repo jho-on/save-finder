@@ -39,6 +39,7 @@ Lista itens com filtros e paginação.
       "id": 1,
       "platform": "instagram",
       "external_id": "DeJ-...",
+      "title": "Legenda do post...",
       "status": "enriched",
       "post_type": "video",
       "thumb_path": "thumbs/instagram-DeJ-....jpg",
@@ -60,7 +61,7 @@ ignorar. As thumbnails são servidas em `/data/<thumb_path>`.
 
 Busca por `caption`, `author` ou `external_id` (case-insensitive, sem FTS5).
 
-**Query params:** `q` (obrigatório), `status`, `limit` (máx. 100, padrão 20), `offset`.
+**Query params:** `q` (obrigatório), `status`, `tag` — slug da tag para combinar busca e filtro —, `limit` (máx. 100, padrão 20), `offset`.
 
 **Resposta:** mesma estrutura de `/api/items`, com o campo extra `query`.
 
@@ -73,15 +74,17 @@ Detalhe de um item, incluindo as tags de classificação.
   "id": 1,
   "platform": "instagram",
   "external_id": "DeJ-...",
+  "title": "Legenda do post...",
   "url": "https://www.instagram.com/p/DeJ-.../",
   "author": "alice",
   "caption": "...",
   "post_type": "video",
   "media_count": 1,
   "thumb_path": "thumbs/instagram-DeJ-....jpg",
+  "classification_method": "ai",
   "tags": [
-    {"slug":"comida-e-bebida","name":"Comida e bebida","level":"broad","confidence":0.6,"source":"auto"},
-    {"slug":"receitas","name":"Receitas","level":"specific","confidence":0.6,"source":"auto"}
+    {"slug":"comida-e-bebida","name":"Comida e bebida","level":"broad","confidence":0.6,"source":"auto","evidence":"llm: ..."},
+    {"slug":"receitas","name":"Receitas","level":"specific","confidence":0.6,"source":"auto","evidence":"llm: ..."}
   ]
 }
 ```
