@@ -244,3 +244,133 @@ body > nav {
 	opacity: 0.4;
 	cursor: not-allowed;
 }
+
+/* Classification method badges shared by item detail and library */
+.method-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.15rem 0.5rem;
+	border: 1.5px solid currentColor;
+	border-radius: 999px;
+	font-size: 0.7rem;
+	font-weight: 800;
+	letter-spacing: 0.05em;
+	line-height: 1.4;
+	text-transform: uppercase;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.method-badge::before {
+	content: "";
+	display: inline-block;
+	width: 0.45rem;
+	height: 0.45rem;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.method-badge.ai {
+	border-color: var(--brand-yellow);
+	background: var(--brand-yellow);
+	color: #000000;
+}
+
+.method-badge.heuristic {
+	border-style: dashed;
+	border-color: currentColor;
+	background: transparent;
+	color: var(--fg);
+}
+
+.method-badge.manual {
+	border-color: var(--brand-pink);
+	background: transparent;
+	color: var(--brand-pink);
+}
+
+/* Small "i" affordance with a hover/focus popup for model evidence */
+.info-tip {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	margin-left: 0.3rem;
+	vertical-align: middle;
+}
+
+.info-tip-button {
+	display: inline-grid;
+	place-items: center;
+	width: 1.05rem;
+	height: 1.05rem;
+	padding: 0;
+	border: 1.5px solid currentColor;
+	border-radius: 50%;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 0.65rem;
+	font-weight: 800;
+	line-height: 1;
+	cursor: help;
+}
+
+.info-tip-button:focus-visible {
+	outline: 2px solid var(--brand-pink);
+	outline-offset: 2px;
+}
+
+.info-tip-popup {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 0.45rem);
+	z-index: 30;
+	width: max-content;
+	max-width: min(20rem, 80vw);
+	padding: 0.55rem 0.65rem;
+	border: 1.5px solid var(--border);
+	border-radius: 4px;
+	background: var(--bg);
+	color: var(--fg);
+	box-shadow: 4px 4px 0 var(--brand-pink);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: normal;
+	line-height: 1.45;
+	text-align: left;
+	text-transform: none;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(4px);
+	transition:
+		opacity 120ms ease,
+		transform 120ms ease,
+		visibility 120ms ease;
+	pointer-events: none;
+}
+
+.info-tip:hover .info-tip-popup,
+.info-tip:focus-within .info-tip-popup {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(0);
+}
+
+/* Method legend shown next to tag section headings */
+.method-legend {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin: 0 0 1rem;
+	color: var(--fg);
+	font-size: 0.78rem;
+}
+
+.method-legend .method-badge {
+	font-size: 0.65rem;
+}

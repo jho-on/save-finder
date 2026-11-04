@@ -70,10 +70,30 @@ def _settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+def classification_method(tags: Sequence[dict[str, object]]) -> str | None:
+    """Summarize how an item was classified for the UI.
+
+    ``ai`` means at least one automatic tag carries LLM/vision evidence.
+    Automatic tags without evidence come from the old keyword heuristic.
+    """
+    if not tags:
+        return None
+    automatic = [tag for tag in tags if tag.get("source") == "auto"]
+    if not automatic:
+        return "manual"
+    evidence = " ".join(str(tag.get("evidence") or "") for tag in automatic)
+    if any(
+        marker in evidence for marker in ("llm:", "vision:", "text+visual", "ollama:", "open-clip:")
+    ):
+        return "ai"
+    return "heuristic"
+
+
 def _item_to_dict(item: Item, tags: Sequence[dict[str, object]] | None = None) -> dict[str, object]:
     thumb = item.thumb_path or None
     if thumb is not None and thumb.startswith("http"):
         thumb = None
+    tag_list = list(tags or [])
     return {
         "id": item.id,
         "platform": item.platform,
@@ -89,7 +109,8 @@ def _item_to_dict(item: Item, tags: Sequence[dict[str, object]] | None = None) -
         "thumb_path": thumb,
         "saved_at": item.saved_at,
         "enriched_at": item.enriched_at,
-        "tags": list(tags or []),
+        "classification_method": classification_method(tag_list),
+        "tags": tag_list,
     }
 
 
@@ -111,6 +132,7 @@ def _tags_for_items(session, item_ids: Sequence[int]) -> dict[int, list[dict[str
                 "level": tag.level.value,
                 "confidence": item_tag.confidence,
                 "source": item_tag.source.value,
+                "evidence": item_tag.evidence,
             }
         )
     return tags_map

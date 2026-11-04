@@ -407,6 +407,26 @@
 			let totalPages = 1;
 			let currentSearch = "";
 
+			function escapeHtml(value) {
+				return String(value ?? "").replace(
+					/[&<>"']/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+							"'": "&#39;",
+						})[c],
+				);
+			}
+
+			const methodLabels = {
+				ai: "IA",
+				heuristic: "Heurística",
+				manual: "Manual",
+			};
+
 			function hxt(url) {
 				fetch(url)
 					.then((r) => r.json())
@@ -461,10 +481,48 @@
 										? "/data/" + i.thumb_path
 										: "";
 
-									const tags =
-										(i.tags || [])
-											.map((t) => t.slug)
-											.join(", ") || "-";
+									const tagItems = i.tags || [];
+									const tags = tagItems.length
+										? tagItems
+												.map((t) =>
+													escapeHtml(t.slug),
+												)
+												.join(", ")
+										: "-";
+
+									const method = i.classification_method;
+									const methodBadge = method
+										? '<span class="method-badge ' +
+											escapeHtml(method) +
+											'">' +
+											escapeHtml(
+												methodLabels[method] ||
+													method,
+											) +
+											"</span>"
+										: "";
+
+									const evidence = tagItems
+										.map((t) => t.evidence)
+										.find(Boolean);
+
+									const evidenceTip = evidence
+										? '<span class="info-tip" tabindex="0" onclick="event.preventDefault(); event.stopPropagation();">' +
+											'<span class="info-tip-button" aria-hidden="true">i</span>' +
+											'<span class="info-tip-popup" role="tooltip">' +
+											escapeHtml(evidence) +
+											"</span></span>"
+										: "";
+
+									const classification =
+										methodBadge || evidenceTip
+											? " | " +
+												methodBadge +
+												(methodBadge && evidenceTip
+													? " "
+													: "") +
+												evidenceTip
+											: "";
 
 									const statusClass =
 										i.status === "error"
@@ -501,7 +559,9 @@
 										statusClass +
 										'">' +
 										(i.status || "-") +
-										"</span></p>" +
+										"</span>" +
+										classification +
+										"</p>" +
 										"</article></a>"
 									);
 								})

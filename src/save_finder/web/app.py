@@ -110,9 +110,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "name": tag.name,
                     "confidence": item_tag.confidence,
                     "source": item_tag.source.value,
+                    "evidence": item_tag.evidence,
                 }
                 for item_tag, tag in rows
             ]
+            method = web_api.classification_method(tag_list)
+            evidence = next(
+                (tag["evidence"] for tag in tag_list if tag["evidence"]),
+                None,
+            )
 
         return templates.TemplateResponse(
             request=request,
@@ -121,6 +127,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "app_name": settings.app_name,
                 "item": item,
                 "tags": tag_list,
+                "classification_method": method,
+                "classification_evidence": evidence,
             },
         )
 

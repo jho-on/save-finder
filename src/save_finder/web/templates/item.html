@@ -311,7 +311,40 @@
 				</dl>
 
 				<section class="tags-section">
-					<h2>Tags de classificação</h2>
+					<h2>
+						Tags de classificação {% if classification_method %}
+						<span class="method-badge {{ classification_method }}">
+							{% if classification_method == 'ai' %}IA{% elif
+							classification_method == 'heuristic' %}Heurística{%
+							else %}Manual{% endif %}
+						</span>
+						{% endif %} {% if classification_evidence %}
+						<span class="info-tip">
+							<button
+								type="button"
+								class="info-tip-button"
+								aria-label="Justificativa do modelo para as tags"
+							>
+								i
+							</button>
+							<span class="info-tip-popup" role="tooltip">
+								{{ classification_evidence }}
+							</span>
+						</span>
+						{% endif %}
+					</h2>
+
+					{% if classification_method %}
+					<p class="method-legend">
+						{% if classification_method == 'ai' %} Tags
+						classificadas com apoio de modelo local (texto e/ou
+						visão). Passe o mouse no “i” para ver a justificativa.
+						{% elif classification_method == 'heuristic' %} Tags
+						geradas apenas pela heurística de palavras-chave, sem
+						justificativa de modelo. {% else %} Tags adicionadas
+						manualmente. {% endif %}
+					</p>
+					{% endif %}
 
 					{% if tags %}
 					<ul class="tags-list">

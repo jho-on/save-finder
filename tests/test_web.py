@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, load_settings
 from save_finder.models import Item, ItemStatus, PlatformSource, PostType
-from save_finder.repositories.tags import add_item_tags, sync_taxonomy
+from save_finder.repositories.tags import add_item_tags, replace_auto_tags, sync_taxonomy
 from save_finder.web import api
 from save_finder.web.app import create_app
 
@@ -74,6 +74,33 @@ def test_api_items_and_detail(client: TestClient, item: Item) -> None:
     assert detail.status_code == 200
     tags = {tag["slug"] for tag in detail.json()["tags"]}
     assert tags == {"comida-e-bebida", "receitas"}
+    assert detail.json()["classification_method"] == "heuristic"
+
+
+def test_item_exposes_ai_method_and_evidence(
+    client: TestClient, item: Item, session: Session
+) -> None:
+    replace_auto_tags(
+        session,
+        item.id,
+        ["receitas"],
+        evidence="llm: receita de bolo caseiro",
+    )
+    session.commit()
+
+    detail = client.get(f"/api/items/{item.id}")
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["classification_method"] == "ai"
+    auto_tags = [tag for tag in body["tags"] if tag["source"] == "auto"]
+    assert auto_tags
+    assert all(tag["evidence"] == "llm: receita de bolo caseiro" for tag in auto_tags)
+
+    page = client.get(f"/item/{item.id}")
+    assert page.status_code == 200
+    assert 'class="method-badge ai"' in page.text
+    assert page.text.count("info-tip-popup") == 1
+    assert "llm: receita de bolo caseiro" in page.text
 
 
 def test_api_items_filter_by_tag(client: TestClient, item: Item) -> None:
