@@ -203,9 +203,26 @@ def _classify_text(text: str, taxonomy: Taxonomy, llm: LLMProvider) -> _Selectio
         "You classify saved social-media posts into a closed taxonomy. "
         "Select exactly one broad tag and only specific tags that belong to it. "
         "Never invent tags. Base the decision on meaning, not on keyword matching. "
+        "The evidence must justify the selected broad tag; if the content does not fit "
+        'any broad tag, choose "outros". Never select a tag that the evidence says '
+        "does not apply. "
         'Answer with a single JSON object: {"broad": "slug", "specific": ["slug"], '
         '"confidence": 0.0, "evidence": "short reason"}. '
-        'Use "outros" when nothing fits. Content may be in any language; keep it as is.'
+        "Content may be in any language; keep it as is.\n"
+        "Examples:\n"
+        '- Post about cooking a cake: {"broad": "comida-e-bebida", '
+        '"specific": ["receitas"], "confidence": 0.9, '
+        '"evidence": "The post teaches a cake recipe."}\n'
+        '- Post about hand-sewing tools and techniques: {"broad": "arte-e-design", '
+        '"specific": ["artesanato"], "confidence": 0.85, '
+        '"evidence": "The video explains sewing tools and hand-sewing techniques, '
+        'a craft."}\n'
+        '- Post about a new phone: {"broad": "tecnologia", '
+        '"specific": ["gadgets"], "confidence": 0.9, '
+        '"evidence": "The post reviews a smartphone."}\n'
+        '- Post about an office meeting: {"broad": "trabalho-e-carreira", '
+        '"specific": [], "confidence": 0.8, '
+        '"evidence": "The post shows a workplace meeting."}'
     )
     prompt = _build_prompt(text, taxonomy)
     try:

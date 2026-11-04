@@ -134,7 +134,9 @@ def test_prompt_lists_the_closed_taxonomy() -> None:
 
     classify_item(_item("assunto aleatorio"), taxonomy, llm=llm)
 
-    _, prompt = llm.calls[0]
+    system, prompt = llm.calls[0]
     assert "comida-e-bebida" in prompt
     assert "receitas (parent: comida-e-bebida)" in prompt
     assert "assunto aleatorio" in prompt
+    assert "Never select a tag that the evidence says does not apply" in system
+    assert "hand-sewing tools" in system
