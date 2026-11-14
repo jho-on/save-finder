@@ -260,6 +260,7 @@ Exemplos: `feat(platforms): add instagram export parser`, `fix(pipeline): remove
 ## Referências
 
 - Plano detalhado: [`docs/development/implementation-plan.md`](docs/development/implementation-plan.md)
+- Decisões de arquitetura: [`docs/adr/README.md`](docs/adr/README.md)
 - Taxonomia inicial: [`docs/architecture/taxonomy.md`](docs/architecture/taxonomy.md)
 - Execução local (não versionada): `docs/development/roadmap.local.md`
 - Export do Instagram: Configurações → Central de Contas → Suas informações e permissões → Baixar suas informações → **Salvos** → JSON → todo o período.
