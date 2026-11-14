@@ -163,6 +163,66 @@
 				flex: 0 0 auto;
 			}
 
+			.tag-filters {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 0.4rem;
+				margin: 0 0 1rem;
+			}
+
+			.tag-filters-label {
+				margin-right: 0.15rem;
+				font-size: 0.75rem;
+				font-weight: 800;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+			}
+
+			.filter-chip {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				width: auto;
+				padding: 0.3rem 0.6rem;
+				border: 2px solid var(--border);
+				border-radius: 999px;
+				background: var(--surface);
+				color: var(--fg);
+				font: inherit;
+				font-size: 0.78rem;
+				font-weight: 700;
+				line-height: 1.4;
+				cursor: pointer;
+				transition:
+					background 0.15s,
+					color 0.15s,
+					border-color 0.15s;
+			}
+
+			.filter-chip:hover {
+				border-color: var(--brand-yellow);
+				background: var(--brand-yellow);
+				color: #000000;
+			}
+
+			.filter-chip.is-active {
+				border-color: var(--fg);
+				background: var(--fg);
+				color: var(--bg);
+			}
+
+			.filter-chip:focus-visible {
+				outline: 3px solid var(--brand-pink);
+				outline-offset: 3px;
+			}
+
+			.filter-count {
+				font-size: 0.68rem;
+				font-weight: 800;
+				opacity: 0.7;
+			}
+
 			.sticky-bottom {
 				position: sticky;
 				bottom: 0;
@@ -348,22 +408,7 @@
 
 						currentSearch = this.q.value.trim();
 						currentOffset = 0;
-
-						if (currentSearch) {
-							hxt(
-								'/api/items/search?q=' +
-									encodeURIComponent(currentSearch) +
-									'&status=classified&limit=' +
-									limit +
-									'&offset=0',
-							);
-						} else {
-							hxt(
-								'/api/items?status=classified&limit=' +
-									limit +
-									'&offset=0',
-							);
-						}
+						hxt(buildUrl(0));
 
 						return false;
 					"
@@ -378,6 +423,35 @@
 
 					<button type="submit">Buscar</button>
 				</form>
+
+				<div
+					class="tag-filters"
+					role="group"
+					aria-label="Filtrar por estado"
+				>
+					<span class="tag-filters-label">Filtrar:</span>
+
+					<button
+						type="button"
+						class="filter-chip is-active"
+						data-status=""
+						onclick="selectFilter(this)"
+					>
+						Todos
+					</button>
+
+					{% for filter in status_filters %}
+					<button
+						type="button"
+						class="filter-chip"
+						data-status="{{ filter.value }}"
+						onclick="selectFilter(this)"
+					>
+						{{ filter.name }}
+						<span class="filter-count">{{ filter.count }}</span>
+					</button>
+					{% endfor %}
+				</div>
 
 				<div id="items">
 					<p>Carregando...</p>
@@ -410,6 +484,7 @@
 			let totalItems = 0;
 			let totalPages = 1;
 			let currentSearch = "";
+			let currentStatus = null;
 
 			function escapeHtml(value) {
 				return String(value ?? "").replace(
@@ -430,6 +505,45 @@
 				heuristic: "Heurística",
 				manual: "Manual",
 			};
+
+			const statusLabels = {
+				pending: "Importado",
+				enriched: "Enriquecido",
+				analyzed: "Baixado",
+				classified: "Classificado",
+				skipped: "Ignorado",
+				unavailable: "Indisponível",
+				error: "Erro",
+			};
+
+			function buildUrl(offset) {
+				const params = new URLSearchParams({
+					limit: String(limit),
+					offset: String(offset),
+				});
+
+				if (currentStatus) {
+					params.set("status", currentStatus);
+				}
+
+				if (currentSearch) {
+					params.set("q", currentSearch);
+					return "/api/items/search?" + params.toString();
+				}
+
+				return "/api/items?" + params.toString();
+			}
+
+			function selectFilter(button) {
+				currentStatus = button.dataset.status || null;
+				currentOffset = 0;
+
+				document.querySelectorAll(".filter-chip").forEach((chip) => {
+					chip.classList.toggle("is-active", chip === button);
+				});
+
+				hxt(buildUrl(0));
+			}
 
 			function hxt(url) {
 				fetch(url)
@@ -559,7 +673,11 @@
 										' | <strong>Status:</strong> <span class="status-badge ' +
 										statusClass +
 										'">' +
-										(i.status || "-") +
+										escapeHtml(
+											statusLabels[i.status] ||
+												i.status ||
+												"-",
+										) +
 										"</span>" +
 										classification +
 										"</p>" +
@@ -576,19 +694,7 @@
 			}
 
 			function loadPage(offset) {
-				const url = currentSearch
-					? "/api/items/search?q=" +
-						encodeURIComponent(currentSearch) +
-						"&status=classified&limit=" +
-						limit +
-						"&offset=" +
-						offset
-					: "/api/items?status=classified&limit=" +
-						limit +
-						"&offset=" +
-						offset;
-
-				hxt(url);
+				hxt(buildUrl(offset));
 			}
 
 			function prevPage() {
@@ -768,7 +874,7 @@
 					});
 			}
 
-			hxt("/api/items?status=classified&limit=21&offset=0");
+			hxt(buildUrl(0));
 		</script>
 	</body>
 </html>

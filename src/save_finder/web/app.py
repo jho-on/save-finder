@@ -22,13 +22,37 @@ from sqlalchemy.orm import Session, sessionmaker
 from save_finder import __version__
 from save_finder.config import Settings, ensure_directories, load_settings
 from save_finder.db import make_engine, make_session_factory, session_scope
-from save_finder.models import Item, ItemTag, PipelineJob, Tag, TagLevel, utc_now_iso
+from save_finder.models import (
+    Item,
+    ItemStatus,
+    ItemTag,
+    PipelineJob,
+    Tag,
+    TagLevel,
+    utc_now_iso,
+)
 from save_finder.platforms.registry import available_platforms
 from save_finder.web import api as web_api
 
 logger = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).parent
+
+STATUS_LABELS: dict[ItemStatus, str] = {
+    ItemStatus.PENDING: "Importado",
+    ItemStatus.ENRICHED: "Enriquecido",
+    ItemStatus.ANALYZED: "Baixado",
+    ItemStatus.CLASSIFIED: "Classificado",
+    ItemStatus.SKIPPED: "Ignorado",
+    ItemStatus.UNAVAILABLE: "Indisponível",
+    ItemStatus.ERROR: "Erro",
+}
+MAIN_STATUSES = (
+    ItemStatus.PENDING,
+    ItemStatus.ENRICHED,
+    ItemStatus.ANALYZED,
+    ItemStatus.CLASSIFIED,
+)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -241,10 +265,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/library", response_class=HTMLResponse, include_in_schema=False)
     def library(request: Request) -> HTMLResponse:
+        with session_scope(app.state.session_factory) as session:
+            status_counts = {
+                ItemStatus(status): count
+                for status, count in session.execute(
+                    select(Item.status, func.count()).group_by(Item.status)
+                )
+            }
+
+        status_filters = [
+            {
+                "value": status.value,
+                "name": STATUS_LABELS[status],
+                "count": status_counts.get(status, 0),
+            }
+            for status in STATUS_LABELS
+            if status in MAIN_STATUSES or status_counts.get(status, 0) > 0
+        ]
+
         return templates.TemplateResponse(
             request=request,
             name="library.html",
-            context={"app_name": settings.app_name, "page": "library"},
+            context={
+                "app_name": settings.app_name,
+                "page": "library",
+                "status_filters": status_filters,
+            },
         )
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)

@@ -63,6 +63,55 @@ def test_item_detail_404(client: TestClient) -> None:
     assert client.get("/item/9999").status_code == 404
 
 
+def test_library_lists_all_items_and_filters_by_status(
+    client: TestClient, item: Item, session: Session
+) -> None:
+    imported = Item(
+        platform="instagram",
+        external_id="DeJ-imported",
+        url="https://www.instagram.com/p/DeJ-imported/",
+        source=PlatformSource.EXPORT,
+        status=ItemStatus.PENDING,
+    )
+    session.add(imported)
+    session.commit()
+
+    page = client.get("/library")
+    assert page.status_code == 200
+    assert "status=classified" not in page.text
+    assert 'data-status="pending"' in page.text
+    assert 'data-status="classified"' in page.text
+    assert "Importado" in page.text
+
+    data = client.get("/api/items?limit=10").json()
+    assert {row["id"] for row in data["items"]} == {item.id, imported.id}
+
+
+def test_api_items_and_search_filter_by_status(
+    client: TestClient, item: Item, session: Session
+) -> None:
+    imported = Item(
+        platform="instagram",
+        external_id="DeJ-imported",
+        url="https://www.instagram.com/p/DeJ-imported/",
+        source=PlatformSource.EXPORT,
+        status=ItemStatus.PENDING,
+    )
+    session.add(imported)
+    session.commit()
+
+    filtered = client.get("/api/items?status=pending").json()
+    assert filtered["total"] == 1
+    assert [row["id"] for row in filtered["items"]] == [imported.id]
+
+    search = client.get("/api/items/search?q=DeJ-imported&status=pending").json()
+    assert search["total"] == 1
+    assert search["items"][0]["id"] == imported.id
+
+    other_status = client.get("/api/items/search?q=DeJ-imported&status=classified").json()
+    assert other_status["total"] == 0
+
+
 def test_api_items_and_detail(client: TestClient, item: Item) -> None:
     response = client.get("/api/items?status=enriched&limit=5")
     assert response.status_code == 200
