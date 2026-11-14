@@ -16,33 +16,6 @@
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
-			:root,
-			[data-theme="light"] {
-				--bg: #ffffff;
-				--fg: #000000;
-				--surface: #ffffff;
-				--border: #000000;
-
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
-			[data-theme="dark"] {
-				--bg: #000000;
-				--fg: #ffffff;
-				--surface: #000000;
-				--border: #ffffff;
-
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
 			body {
 				margin: 0;
 				background: var(--bg);
@@ -102,9 +75,9 @@
 			}
 
 			button {
-				background: var(--fg);
-				color: var(--bg);
-				border: 2px solid var(--fg);
+				background: var(--color-primary);
+				color: var(--on-primary);
+				border: 2px solid var(--color-primary);
 				padding: 0.5rem 1rem;
 				border-radius: 4px;
 				cursor: pointer;
@@ -115,10 +88,10 @@
 					border-color 0.15s;
 			}
 
-			button:hover:not(:disabled) {
-				background: var(--brand-yellow);
-				color: #000000;
-				border-color: var(--brand-yellow);
+			.sticky-top button:hover:not(:disabled) {
+				background: var(--brand-pink);
+				color: var(--on-secondary);
+				border-color: var(--brand-pink);
 			}
 
 			button:focus-visible,
@@ -203,7 +176,7 @@
 			.filter-chip:hover {
 				border-color: var(--brand-yellow);
 				background: var(--brand-yellow);
-				color: #000000;
+				color: var(--on-primary);
 			}
 
 			.filter-chip.is-active {
@@ -254,7 +227,7 @@
 
 			.sticky-bottom button:hover:not(:disabled) {
 				background: var(--brand-pink);
-				color: #000000;
+				color: var(--on-secondary);
 				border-color: var(--brand-pink);
 			}
 
@@ -342,12 +315,22 @@
 
 			.status-badge.enriched {
 				background: var(--brand-yellow);
-				color: #000000;
+				color: var(--on-primary);
+			}
+
+			.status-badge.analyzed {
+				background: var(--color-accent);
+				color: var(--on-accent);
+			}
+
+			.status-badge.classified {
+				background: var(--color-success);
+				color: var(--on-success);
 			}
 
 			.status-badge.error {
 				background: var(--brand-pink);
-				color: #000000;
+				color: var(--on-secondary);
 			}
 
 			.error-box {
@@ -644,7 +627,12 @@
 											? "error"
 											: i.status === "enriched"
 												? "enriched"
-												: "";
+												: i.status === "analyzed"
+													? "analyzed"
+													: i.status ===
+														  "classified"
+														? "classified"
+														: "";
 
 									return (
 										'<a href="/item/' +
@@ -811,6 +799,11 @@
 						? "var(--brand-pink)"
 						: "var(--brand-yellow)";
 
+				const onColor =
+					status === "error"
+						? "var(--on-secondary)"
+						: "var(--on-primary)";
+
 				el.innerHTML =
 					'<div style="padding:.5rem;border:2px solid ' +
 					color +
@@ -819,14 +812,20 @@
 					op +
 					'</strong> — <span style="display:inline-block;padding:.1rem .4rem;background:' +
 					color +
-					';color:#000000;font-weight:bold;border-radius:3px;">' +
+					";color:" +
+					onColor +
+					';font-weight:bold;border-radius:3px;">' +
 					(status === "done"
 						? "Concluído"
 						: status === "running"
 							? "Em execução"
-							: status === "error"
-								? "Erro"
-								: "Iniciado") +
+							: status === "cancelling"
+								? "Parando..."
+								: status === "interrupted"
+									? "Interrompido"
+									: status === "error"
+										? "Erro"
+										: "Iniciado") +
 					"</span><br/>" +
 					"<span>Job: " +
 					(jobData.job_id || "-") +

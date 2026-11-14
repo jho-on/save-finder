@@ -16,29 +16,6 @@
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
-			:root,
-			[data-theme="light"] {
-				--bg: #ffffff;
-				--fg: #000000;
-				--surface: #ffffff;
-				--border: #000000;
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
-			[data-theme="dark"] {
-				--bg: #000000;
-				--fg: #ffffff;
-				--surface: #000000;
-				--border: #ffffff;
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
 			body {
 				margin: 0;
 				background: var(--bg);
@@ -63,7 +40,9 @@
 			}
 
 			.intro .eyebrow a:hover {
-				color: var(--brand-yellow);
+				color: var(--color-fg);
+				text-decoration: underline;
+				text-decoration-color: var(--brand-yellow);
 			}
 
 			.intro .lede {

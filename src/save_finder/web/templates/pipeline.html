@@ -1,35 +1,21 @@
 <!doctype html>
 <html lang="pt-BR" data-theme="light">
 	<head>
+		<script>
+			(function () {
+				const saved = localStorage.getItem("savefinder-theme");
+				if (saved) {
+					document.documentElement.setAttribute("data-theme", saved);
+				}
+			})();
+		</script>
+
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Painel — {{ app_name }}</title>
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
-			:root,
-			[data-theme="light"] {
-				--bg: #ffffff;
-				--fg: #000000;
-				--surface: #ffffff;
-				--border: #000000;
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
-			[data-theme="dark"] {
-				--bg: #000000;
-				--fg: #ffffff;
-				--surface: #000000;
-				--border: #ffffff;
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
 			body {
 				margin: 0;
 				background: var(--bg);
@@ -54,7 +40,9 @@
 			}
 
 			.intro .eyebrow a:hover {
-				color: var(--brand-yellow);
+				color: var(--color-fg);
+				text-decoration: underline;
+				text-decoration-color: var(--brand-yellow);
 			}
 
 			.intro .lede {
@@ -174,9 +162,9 @@
 			}
 
 			.card button {
-				background: var(--fg);
-				color: var(--bg);
-				border: 2px solid var(--fg);
+				background: var(--color-primary);
+				color: var(--on-primary);
+				border: 2px solid var(--color-primary);
 				padding: 0.55rem 1rem;
 				border-radius: 4px;
 				cursor: pointer;
@@ -188,25 +176,31 @@
 			}
 
 			.card button:hover {
-				background: var(--brand-yellow);
-				color: #000000;
-				border-color: var(--brand-yellow);
+				background: var(--brand-pink);
+				color: var(--on-secondary);
+				border-color: var(--brand-pink);
 			}
 
 			.card button.stop-button {
 				background: var(--brand-pink);
 				border-color: var(--brand-pink);
-				color: #000000;
+				color: var(--on-secondary);
 			}
 
 			.card button.stop-button:hover {
 				background: var(--brand-yellow);
 				border-color: var(--brand-yellow);
+				color: var(--on-primary);
 			}
 
 			.card button:disabled {
 				opacity: 0.6;
 				cursor: wait;
+			}
+
+			.card button:focus-visible {
+				outline: 3px solid var(--color-focus);
+				outline-offset: 3px;
 			}
 
 			#drop-import {
@@ -258,15 +252,20 @@
 			}
 
 			.job-status.done {
-				color: var(--brand-yellow);
+				color: var(--color-success);
 			}
 
-			.job-status.running {
-				color: var(--brand-yellow);
+			.job-status.running,
+			.job-status.cancelling {
+				color: var(--color-secondary);
+			}
+
+			.job-status.interrupted {
+				color: var(--color-secondary);
 			}
 
 			.job-status.error {
-				color: var(--brand-pink);
+				color: var(--color-danger);
 			}
 
 			.progress-track {
@@ -344,16 +343,17 @@
 				font-weight: 700;
 			}
 
-			.stage-status.running {
-				color: var(--brand-yellow);
+			.stage-status.running,
+			.stage-status.cancelling {
+				color: var(--color-secondary);
 			}
 
 			.stage-status.error {
-				color: var(--brand-pink);
+				color: var(--color-danger);
 			}
 
 			.stage-status.done {
-				color: var(--brand-yellow);
+				color: var(--color-success);
 			}
 
 			.stage-status.waiting {

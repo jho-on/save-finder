@@ -16,33 +16,6 @@
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
-			:root,
-			[data-theme="light"] {
-				--bg: #ffffff;
-				--fg: #000000;
-				--surface: #ffffff;
-				--border: #000000;
-
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
-			[data-theme="dark"] {
-				--bg: #000000;
-				--fg: #ffffff;
-				--surface: #000000;
-				--border: #ffffff;
-
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
 			body {
 				margin: 0;
 				background: var(--bg);
@@ -87,6 +60,19 @@
 				color: var(--fg);
 				font-size: 0.9rem;
 				line-height: 1.6;
+			}
+
+			.status-enriched,
+			.status-analyzed {
+				color: var(--color-secondary);
+			}
+
+			.status-classified {
+				color: var(--color-success);
+			}
+
+			.status-error {
+				color: var(--color-danger);
 			}
 
 			.card {
@@ -200,8 +186,8 @@
 				padding: 0.45rem 0.7rem;
 				border: 2px solid var(--brand-yellow);
 				border-radius: 3px;
-				color: var(--fg);
-				background: var(--surface);
+				color: var(--on-highlight);
+				background: var(--color-highlight);
 				font-size: 0.85rem;
 			}
 
@@ -214,8 +200,9 @@
 			}
 
 			.tag-confidence {
-				color: var(--fg);
+				color: inherit;
 				font-size: 0.75rem;
+				opacity: 0.82;
 			}
 
 			.empty-tags {
@@ -303,7 +290,7 @@
 					<dt>Status</dt>
 					<dd>
 						<span
-							class="{% if item.status == 'error' %}status-error{% elif item.status == 'enriched' %}status-enriched{% endif %}"
+							class="{% if item.status == 'error' %}status-error{% elif item.status == 'enriched' %}status-enriched{% elif item.status == 'analyzed' %}status-analyzed{% elif item.status == 'classified' %}status-classified{% endif %}"
 							style="font-weight: bold"
 						>
 							{{ item.status }}

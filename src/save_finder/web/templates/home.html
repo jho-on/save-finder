@@ -22,29 +22,6 @@
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
-			:root,
-			[data-theme="light"] {
-				--bg: #ffffff;
-				--fg: #000000;
-				--surface: #ffffff;
-				--border: #000000;
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
-			[data-theme="dark"] {
-				--bg: #000000;
-				--fg: #ffffff;
-				--surface: #000000;
-				--border: #ffffff;
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-				--accent: var(--brand-yellow);
-				--error: var(--brand-pink);
-			}
-
 			body {
 				margin: 0;
 				background: var(--bg);
@@ -107,10 +84,10 @@
 				min-height: 44px;
 				box-sizing: border-box;
 				padding: 0.7rem 1.2rem;
-				border: 2px solid var(--fg);
+				border: 2px solid var(--color-primary);
 				border-radius: 4px;
-				background: var(--fg);
-				color: var(--bg);
+				background: var(--color-primary);
+				color: var(--on-primary);
 				font-weight: 800;
 				text-decoration: none;
 				transition:
@@ -120,12 +97,13 @@
 			}
 
 			.action-link:hover {
-				background: var(--brand-yellow);
-				border-color: var(--brand-yellow);
-				color: #000000;
+				background: var(--brand-pink);
+				border-color: var(--brand-pink);
+				color: var(--on-secondary);
 			}
 
 			.action-link.secondary {
+				border-color: var(--fg);
 				background: var(--surface);
 				color: var(--fg);
 			}
@@ -133,7 +111,7 @@
 			.action-link.secondary:hover {
 				background: var(--brand-pink);
 				border-color: var(--brand-pink);
-				color: #000000;
+				color: var(--on-secondary);
 			}
 
 			.section {

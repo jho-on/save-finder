@@ -16,31 +16,6 @@
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
-			:root,
-			[data-theme="light"] {
-				--bg: #ffffff;
-				--fg: #000000;
-				--accent: #fee761;
-				--error: #ff0044;
-				--surface: #ffffff;
-				--border: #000000;
-
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-			}
-
-			[data-theme="dark"] {
-				--bg: #000000;
-				--fg: #ffffff;
-				--accent: #fee761;
-				--error: #ff0044;
-				--surface: #000000;
-				--border: #ffffff;
-
-				--brand-yellow: #fee761;
-				--brand-pink: #ff0044;
-			}
-
 			body {
 				margin: 0;
 				background: var(--bg);
@@ -121,10 +96,10 @@
 				flex: 0 0 auto;
 				width: auto;
 				padding: 0.5rem 1rem;
-				border: 2px solid var(--fg);
+				border: 2px solid var(--color-primary);
 				border-radius: 4px;
-				background: var(--fg);
-				color: var(--bg);
+				background: var(--color-primary);
+				color: var(--on-primary);
 				font: inherit;
 				font-weight: 700;
 				cursor: pointer;
@@ -135,9 +110,9 @@
 			}
 
 			.search-form button:hover {
-				background: var(--brand-yellow);
-				border-color: var(--brand-yellow);
-				color: #000000;
+				background: var(--brand-pink);
+				border-color: var(--brand-pink);
+				color: var(--on-secondary);
 			}
 
 			.search-form input:focus-visible,
@@ -187,7 +162,7 @@
 			.filter-chip:hover {
 				border-color: var(--brand-yellow);
 				background: var(--brand-yellow);
-				color: #000000;
+				color: var(--on-primary);
 			}
 
 			.filter-chip.is-active {
@@ -287,12 +262,22 @@
 
 			.status-badge.enriched {
 				background: var(--brand-yellow);
-				color: #000000;
+				color: var(--on-primary);
+			}
+
+			.status-badge.analyzed {
+				background: var(--color-accent);
+				color: var(--on-accent);
+			}
+
+			.status-badge.classified {
+				background: var(--color-success);
+				color: var(--on-success);
 			}
 
 			.status-badge.error {
 				background: var(--brand-pink);
-				color: #000000;
+				color: var(--on-secondary);
 			}
 
 			.error-box {
@@ -337,7 +322,7 @@
 			.sticky-bottom button:hover:not(:disabled) {
 				background: var(--brand-pink);
 				border-color: var(--brand-pink);
-				color: #000000;
+				color: var(--on-secondary);
 			}
 
 			.sticky-bottom button:disabled {
@@ -626,7 +611,12 @@
 											? "error"
 											: i.status === "enriched"
 												? "enriched"
-												: "";
+												: i.status === "analyzed"
+													? "analyzed"
+													: i.status ===
+														  "classified"
+														? "classified"
+														: "";
 
 									return (
 										'<a href="/item/' +
