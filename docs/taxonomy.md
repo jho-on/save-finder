@@ -3,7 +3,7 @@
 > Lista fechada de tags. O classificador só pode emitir o que está aqui.
 > Regras em [`implementation-plan.md`](implementation-plan.md#5-taxonomia): dois níveis, específica propaga a ampla, fechada e versionada.
 > A descrição visual em inglês é o texto comparado com os embeddings de imagem (CLIP só entende inglês). Os nomes exibidos ficam em pt-BR.
-> Esta lista é uma proposta inicial: revise antes da Fase 4 e ajuste com o uso real.
+> A lista efetiva é a de `config/taxonomy.yaml`; esta página é a referência legível. Mudanças exigem edição da lista e reclassificação dos itens afetados.
 
 ## Amplas
 

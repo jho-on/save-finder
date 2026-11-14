@@ -1,4 +1,4 @@
-# API — SaveFinder (Fase 5)
+# API — SaveFinder
 
 Base local: `http://127.0.0.1:8000`
 
@@ -59,7 +59,10 @@ ignorar. As thumbnails são servidas em `/data/<thumb_path>`.
 
 ### `GET /api/items/search`
 
-Busca por `caption`, `author` ou `external_id` (case-insensitive, sem FTS5).
+Busca textual com índice FTS5 derivado e ranking BM25 (melhor match primeiro). Cobre `caption`,
+`author`, `external_id`, transcrição e nomes de tags. Os tokens são combinados com AND e casam
+por prefixo (`receit` encontra `receita`); diacríticos são ignorados (`fecula` encontra `fécula`).
+O índice é derivado e reconstruível a qualquer momento com `save-finder db reindex`.
 
 **Query params:** `q` (obrigatório), `status`, `tag` — slug da tag para combinar busca e filtro —, `limit` (máx. 100, padrão 20), `offset`.
 
@@ -91,6 +94,15 @@ Detalhe de um item, incluindo as tags de classificação.
 
 Regra de persistência: cada item tem **uma única tag ampla**, sempre acompanhada das específicas
 que pertencem a ela. Se `source` == `manual`, a reclassificação automática (`auto`) não sobrescreve.
+
+---
+
+## Taxonomia
+
+### `GET /api/taxonomy`
+
+Expõe a taxonomia fechada carregada de `config/taxonomy.yaml`: versão e lista de tags com
+`slug`, `name`, `level` e `parent`. Consumida pelo editor manual de tags da UI.
 
 ---
 
@@ -134,7 +146,13 @@ Contagens gerais e percentuais por etapa, usando o total de itens como denominad
 
 ### `GET /api/pipeline/{job_id}`
 
-Estado do job (`running`, `done`, `error`, `interrupted`), progresso, resultado e erro.
+Estado do job (`running`, `cancelling`, `done`, `error`, `interrupted`), progresso, resultado e erro.
+
+### `POST /api/pipeline/{job_id}/cancel`
+
+Solicita o cancelamento de um job em execução: marca o job como `cancelling` e o worker para
+na próxima etapa segura. Se o job já terminou (ou não existe), responde com o status atual e
+`cancelled: false` (id inexistente devolve 404).
 
 ---
 
@@ -152,7 +170,8 @@ Estado do job (`running`, `done`, `error`, `interrupted`), progresso, resultado 
 ## Restrições e notas
 
 - Nenhum endpoint persiste mídia original. `thumb_path` é o único caminho de imagem servido localmente.
-- A busca atual usa `ilike`; FTS5 pode ser adicionada em `repositories/search.py` sem alterar a API.
+- O índice de busca é derivado e reconstruível: `repositories/search.py` recria `items_fts`
+  a partir de `items`, `transcripts` e `item_tags`, sem alterar a API.
 - A classificação usa LLM (`ollama`) para texto e CLIP (`open-clip`) para visão; sem os
   provedores configurados, `classify/fuse.py` cai na heurística de palavras-chave sem
   alterar os contratos JSON. Específicas só podem vir do texto, e o resultado sempre

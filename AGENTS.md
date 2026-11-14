@@ -74,10 +74,12 @@ Modelos, providers e versões ficam em `config/settings.toml`. Sem build step de
 ├── README.md
 ├── pyproject.toml
 ├── alembic.ini
+├── Makefile
 ├── .env.example
 ├── docs/
 │   ├── implementation-plan.md
 │   ├── taxonomy.md
+│   ├── api.md
 │   └── roadmap.local.md   # gitignored
 ├── config/
 │   ├── settings.toml
@@ -89,23 +91,25 @@ Modelos, providers e versões ficam em `config/settings.toml`. Sem build step de
 ├── migrations/            # Alembic
 │   ├── env.py
 │   └── versions/
-├── scripts/
-│   └── spike.py
 ├── src/save_finder/
 │   ├── cli.py
 │   ├── config.py
 │   ├── db.py              # engine e sessão
 │   ├── models.py          # modelos SQLAlchemy
+│   ├── errors.py          # exceções de domínio
+│   ├── importer.py        # importação idempotente do export
+│   ├── analysis.py        # etapa de análise (workspace → persistir → apagar)
 │   ├── repositories/      # acesso a dados
 │   │   ├── items.py
 │   │   ├── tags.py
+│   │   ├── analysis.py    # transcript e embedding
 │   │   └── search.py      # FTS5 isolado
 │   ├── providers/         # Protocols + implementações locais
 │   │   ├── base.py
 │   │   ├── asr.py
 │   │   ├── vision.py
-│   │   └── llm.py
-│   ├── pipeline.py
+│   │   ├── llm.py
+│   │   └── factory.py
 │   ├── platforms/
 │   │   ├── base.py        # PlatformAdapter + YtDlpAdapter
 │   │   ├── registry.py
@@ -128,15 +132,16 @@ Modelos, providers e versões ficam em `config/settings.toml`. Sem build step de
 ## Comandos
 
 ```bash
-uv sync                      # alternativa: python -m venv .venv && pip install -e ".[dev]"
+uv sync --extra dev             # alternativa: python -m venv .venv && pip install -e ".[dev]"
+uv sync --all-extras            # com as dependências locais de IA (asr, vision, llm)
 
 uv run save-finder db init
-uv run save-finder import instagram ~/Downloads/instagram-*/your_instagram_activity/saved
+uv run save-finder db reindex   # reconstrói o índice FTS5 derivado
+uv run save-finder import instagram ~/Downloads/instagram-*/export.zip
 uv run save-finder enrich --limit 30
-uv run save-finder analyze --limit 5
-uv run save-finder classify --limit 5
-uv run save-finder pipeline --limit 30      # enrich + analyze + classify
-uv run save-finder serve                    # http://127.0.0.1:8000
+uv run save-finder download --limit 3   # download + análise em workspace temporário
+uv run save-finder classify --limit 30
+uv run save-finder serve                # http://127.0.0.1:8000
 uv run save-finder stats
 
 uv run pytest -q

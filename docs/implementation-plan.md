@@ -64,7 +64,7 @@ export oficial → adapter → import → enrich → download temporário → an
 | D15 | Imagem é cidadã de primeira classe, não resíduo | Boa parte dos salvos é foto ou carrossel sem vídeo; ignorar isso perderia o acervo |
 | D16 | Um embedding por item, agregando as mídias | Mantém o custo por item previsível; embedding por peça só quando a UI exibir carrossel |
 | D17 | MVP é web para computador | Evita construir autenticação e transporte antes do produto estar de pé |
-| D18 | Limiares com padrões iniciais, calibrados na Fase 4 | Permite codar antes da amostra rotulada existir, sem congelar números no chute |
+| D18 | Limiares com padrões iniciais, ajustados com o uso real | Permite codar sem congelar números no chute |
 | D19 | Importação aceita o ZIP oficial e upload por arrastar na web | É o formato real da exportação; evita descompactação manual e mantém curtidas e comentários fora |
 | D20 | Texto decide quando há fala/caption; visão entra quando não há texto ou o LLM não encontra categoria | Mantém as específicas no texto e usa o visual para o caso típico de imagem/carrossel; evita que um frame isolado sobreponha a fala |
 
@@ -142,7 +142,7 @@ Sinais: transcrição, caption, frames e imagens. O texto tem peso maior quando 
 
 O LLM recebe caption + transcrição e devolve uma ampla e específicas daquela ampla, validado contra a taxonomia. O visual compara o embedding do item com as descrições em inglês das amplas; ele decide a ampla, mas não inventa específicas. Quando os dois concordam na ampla, as específicas do texto são mantidas. Resposta inválida do LLM cai para a heurística determinística.
 
-Limiares nascem com padrões iniciais e são calibrados sobre a amostra rotulada da Fase 4; não ficam presos a números escolhidos no chute. Reclassificar usa apenas transcrição e embedding já persistidos, sem rede.
+Limiares nascem com padrões iniciais e são ajustados com o uso real; não ficam presos a números escolhidos no chute. Reclassificar usa apenas transcrição e embedding já persistidos, sem rede.
 
 Aceite: 30 itens classificados, com vídeo e imagem na amostra; regra pai-filho respeitada; reclassificação offline reproduz o resultado.
 
@@ -185,4 +185,3 @@ Testes de rede e de modelo ficam marcados e fora do conjunto padrão. Nenhum tes
 
 - Revisar a lista de tags depois dos primeiros lotes reais; hoje é proposta, não consenso.
 - Definir o transporte de acesso remoto quando o uso em celular entrar na pauta, com dois critérios já fixados: serviço não exposto publicamente e autenticação de usuário único.
-- Confirmar na Fase 0 se o downloader devolve, para carrossel, todas as peças na ordem correta; se não devolver, o adaptador precisa reconstruir a ordem.

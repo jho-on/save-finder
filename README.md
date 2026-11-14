@@ -31,7 +31,9 @@ python3 -m venv .venv
 Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão:
 
 ```bash
-.venv/bin/python -m pip install -e ".[asr,vision,llm]"
+uv sync --all-extras
+# ou, com venv e pip:
+.venv/bin/python -m pip install -e ".[dev,asr,vision,llm]"
 ```
 
 O classificador usa três provedores locais, configurados em `config/settings.toml`:
@@ -98,6 +100,12 @@ O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens
 # reclassificar do banco, sem baixar mídia nem acessar a rede
 .venv/bin/save-finder classify --reclassify --limit 30
 
+# incluir na reclassificação as tags removidas manualmente
+.venv/bin/save-finder classify --restore-removed --reclassify --limit 30
+
+# reconstrói o índice de busca (FTS5) a partir dos dados existentes
+.venv/bin/save-finder db reindex
+
 # contagens por status e plataforma
 .venv/bin/save-finder stats
 
@@ -119,7 +127,11 @@ removida em `finally`. `classify` usa os sinais persistidos e grava tags com con
 e evidência; `--reclassify` substitui apenas tags automáticas antigas e preserva
 correções manuais.
 
-A API expõe `GET /api/health`, listagem/busca em `/api/items`, execução do pipeline em
+A busca da biblioteca cobre caption, autor, external_id, transcrição e tags, com ranking BM25
+sobre um índice FTS5 derivado. Importação, enriquecimento, análise e edição de tags mantêm o
+índice atualizado sozinhos; `db reindex` existe para refazê-lo do zero.
+
+A API expõe `GET /api/health`, listagem em `/api/items` e busca em `/api/items/search`, execução do pipeline em
 `POST /api/pipeline/*` e acompanhamento dos jobs. A referência completa está em
 [`docs/api.md`](docs/api.md); documentação interativa em `/docs`.
 
