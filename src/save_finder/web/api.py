@@ -1,4 +1,4 @@
-"""JSON API routes for library browsing and pipeline execution (fase 5)."""
+"""JSON API routes for library browsing and pipeline execution."""
 
 from __future__ import annotations
 
@@ -315,7 +315,7 @@ def get_taxonomy(request: Request) -> dict[str, object]:
     }
 
 
-# Pipeline execution (fase 5, background threads, not a durable worker queue)
+# Pipeline execution (background threads, not a durable worker queue)
 def _start_job(operation: str, session_factory, **params: object) -> str:
     job_id = str(uuid4())
     job = PipelineJob(

@@ -129,7 +129,7 @@ def classify_persisted_item(
     """Reclassify using only caption, transcript and embedding from the database.
 
     This path never touches the network or the original media, which is what
-    makes offline reclassification reproducible after the Fase 4 acceptance.
+    makes offline reclassification reproducible.
     """
     try:
         embedding = load_embedding(item)

@@ -282,7 +282,7 @@ def download_command(
         ),
     ] = True,
 ) -> None:
-    """Download media pieces and analyze them (Fase 3/4)."""
+    """Download media pieces and analyze them."""
     settings = _settings()
     ensure_directories(settings)
     try:
@@ -350,7 +350,7 @@ def classify_command(
         ),
     ] = False,
 ) -> None:
-    """Classify items with AI signals and the closed taxonomy (Fase 4)."""
+    """Classify items with AI signals and the closed taxonomy."""
     settings = _settings()
     ensure_directories(settings)
     try:
@@ -378,7 +378,7 @@ def classify_command(
                 query = query.where(Item.id.in_(select(MediaAsset.item_id)))
                 query = query.where(~Item.id.in_(select(ItemTag.item_id)))
             items = session.scalars(query.order_by(Item.id).limit(limit)).all()
-            table = Table(title="Classification (Fase 4)")
+            table = Table(title="Classification")
             table.add_column("Item")
             table.add_column("Tags")
             table.add_column("Evidence", overflow="fold")
