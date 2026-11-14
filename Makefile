@@ -1,33 +1,44 @@
-VENV ?= .venv
-PY := $(VENV)/bin/python
-SF := $(VENV)/bin/save-finder
+# SaveFinder monorepo — comandos comuns.
+# Cada alvo delega para a aplicação correspondente.
 
-.PHONY: setup test lint format check db-init import stats serve
+.PHONY: test test-local test-api test-web test-android build build-local build-api build-web build-android check check-local check-api check-web
 
-setup:
-	python3 -m venv $(VENV)
-	$(PY) -m pip install --upgrade pip
-	$(PY) -m pip install -e ".[dev]"
+test: test-local test-api test-web test-android
 
-test:
-	$(VENV)/bin/pytest
+test-local:
+	$(MAKE) -C apps/local test
 
-lint:
-	$(VENV)/bin/ruff check .
+test-api:
+	cd apps/api && go test ./...
 
-format:
-	$(VENV)/bin/ruff format .
+test-web:
+	cd apps/frontend/web && go test ./...
 
-check:
-	$(VENV)/bin/ruff check .
-	$(VENV)/bin/ruff format --check .
-	$(VENV)/bin/pytest
+test-android:
+	cd apps/frontend/android && npm test -- --ci
 
-db-init:
-	$(SF) db init
+build: build-local build-api build-web build-android
 
-stats:
-	$(SF) stats
+build-local:
+	cd apps/local && .venv/bin/python -c "import save_finder"
 
-serve:
-	$(SF) serve
+build-android:
+	cd apps/frontend/android && npx tsc --noEmit
+
+build-api:
+	cd apps/api && go build -o /dev/null ./cmd/api
+
+build-web:
+	cd apps/frontend/web && go build -o /dev/null ./cmd/web
+
+# Verificações sem alterar código.
+check: check-local check-api check-web
+
+check-local:
+	cd apps/local && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+
+check-api:
+	cd apps/api && go vet ./...
+
+check-web:
+	cd apps/frontend/web && go vet ./...
