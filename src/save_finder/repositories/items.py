@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
@@ -30,12 +31,18 @@ class DatabaseStats:
     tags: int
 
 
-def import_saved_items(session: Session, items: Iterable[SavedItem]) -> ImportStats:
+def import_saved_items(
+    session: Session,
+    items: Iterable[SavedItem],
+    *,
+    cancel_event: threading.Event | None = None,
+) -> ImportStats:
     """Idempotently insert normalized items.
 
     The identity is ``(platform, external_id)``. Existing rows are never
     duplicated; a missing collection/author/saved date is filled in when the
-    new export supplies it.
+    new export supplies it. Cancellation stops before the next insert, so a
+    partially imported export can be resumed by running it again.
     """
     batches: dict[str, dict[str, SavedItem]] = {}
     for item in items:
@@ -54,7 +61,10 @@ def import_saved_items(session: Session, items: Iterable[SavedItem]) -> ImportSt
 
     new = 0
     existing = 0
+    stopped = False
     for platform, batch in batches.items():
+        if cancel_event is not None and cancel_event.is_set():
+            break
         rows = session.scalars(
             select(Item).where(
                 Item.platform == platform,
@@ -63,6 +73,9 @@ def import_saved_items(session: Session, items: Iterable[SavedItem]) -> ImportSt
         )
         known = {row.external_id: row for row in rows}
         for external_id, saved in batch.items():
+            if cancel_event is not None and cancel_event.is_set():
+                stopped = True
+                break
             row = known.get(external_id)
             if row is None:
                 session.add(
@@ -93,6 +106,9 @@ def import_saved_items(session: Session, items: Iterable[SavedItem]) -> ImportSt
                 changed = True
             if changed:
                 row.updated_at = utc_now_iso()
+
+        if stopped:
+            break
 
     session.flush()
     return ImportStats(new=new, existing=existing)

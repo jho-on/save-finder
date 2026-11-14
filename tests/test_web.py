@@ -214,6 +214,38 @@ def test_pipeline_start_and_status(client: TestClient, monkeypatch: pytest.Monke
 
 def test_pipeline_unknown_job(client: TestClient) -> None:
     assert client.get("/api/pipeline/missing").status_code == 404
+    assert client.post("/api/pipeline/missing/cancel").status_code == 404
+
+
+def test_pipeline_cancel_running_job(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(api, "_start_background_task", lambda *args, **kwargs: None)
+    started = client.post("/api/pipeline/enrich", data={"platform": "instagram"})
+    job_id = started.json()["job_id"]
+
+    response = client.post(f"/api/pipeline/{job_id}/cancel")
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": job_id,
+        "status": "cancelling",
+        "cancelled": True,
+    }
+    assert client.app.state.job_cancel_events[job_id].is_set()
+    assert client.get(f"/api/pipeline/{job_id}").json()["status"] == "cancelling"
+
+
+def test_pipeline_cancel_finished_job(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(api, "_start_background_task", lambda *args, **kwargs: None)
+    started = client.post("/api/pipeline/classify", data={"platform": "instagram"})
+    job_id = started.json()["job_id"]
+    api._update_job(job_id, client.app.state.session_factory, status="done")
+
+    response = client.post(f"/api/pipeline/{job_id}/cancel")
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": job_id,
+        "status": "done",
+        "cancelled": False,
+    }
 
 
 def test_pipeline_stats(client: TestClient, item: Item) -> None:

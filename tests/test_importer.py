@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import threading
 import zipfile
 from pathlib import Path
 
@@ -63,6 +64,26 @@ def test_import_zip_cleans_temporary_files(
 ) -> None:
     _import(session, settings, instagram_zip)
 
+    assert list(settings.paths.tmp.iterdir()) == []
+
+
+def test_import_honors_cancel_event(
+    session: Session, settings: Settings, instagram_zip: Path
+) -> None:
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    result = import_export(
+        session,
+        platform="instagram",
+        path=instagram_zip,
+        tmp_dir=settings.paths.tmp,
+        limits=LIMITS,
+        cancel_event=cancel_event,
+    )
+
+    assert result.total == 0
+    assert count_items(session) == 0
     assert list(settings.paths.tmp.iterdir()) == []
 
 

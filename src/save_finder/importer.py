@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import stat
 import tempfile
+import threading
 import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -46,13 +47,32 @@ def import_export(
     path: Path,
     tmp_dir: Path,
     limits: ImportConfig,
+    cancel_event: threading.Event | None = None,
 ) -> ImportResult:
-    """Parse an export (directory, JSON file or official ZIP) and persist it."""
+    """Parse an export (directory, JSON file or official ZIP) and persist it.
+
+    ``cancel_event`` makes the web pipeline stop between parsing and each
+    insert. The parser itself is synchronous, so a cancellation requested
+    while it runs takes effect as soon as it returns.
+    """
     adapter = get_adapter(platform)
-    with materialize_export(path, tmp_dir=tmp_dir, limits=limits) as source:
+    if cancel_event is not None and cancel_event.is_set():
+        return ImportResult(platform=platform, new=0, existing=0, ignored=0, unreadable=0)
+
+    with materialize_export(
+        path,
+        tmp_dir=tmp_dir,
+        limits=limits,
+        cancel_event=cancel_event,
+    ) as source:
+        if cancel_event is not None and cancel_event.is_set():
+            return ImportResult(platform=platform, new=0, existing=0, ignored=0, unreadable=0)
         items = list(adapter.parse_export(source))
 
-    stats = import_saved_items(session, items)
+    if cancel_event is not None and cancel_event.is_set():
+        return ImportResult(platform=platform, new=0, existing=0, ignored=0, unreadable=0)
+
+    stats = import_saved_items(session, items, cancel_event=cancel_event)
     return ImportResult(
         platform=platform,
         new=stats.new,
@@ -69,6 +89,7 @@ def materialize_export(
     *,
     tmp_dir: Path,
     limits: ImportConfig,
+    cancel_event: threading.Event | None = None,
 ) -> Iterator[Path]:
     """Yield a path the adapter can parse, extracting ZIPs safely."""
     path = Path(path)
@@ -86,7 +107,7 @@ def materialize_export(
     tmp_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="savefinder-import-", dir=tmp_dir) as raw:
         extraction = Path(raw)
-        _extract_saved_json(path, extraction, limits)
+        _extract_saved_json(path, extraction, limits, cancel_event=cancel_event)
         yield extraction
 
 
@@ -112,7 +133,13 @@ def copy_upload(source: BinaryIO, dest: Path, *, max_bytes: int) -> None:
         raise ExportImportError("uploaded archive is empty")
 
 
-def _extract_saved_json(archive_path: Path, dest: Path, limits: ImportConfig) -> None:
+def _extract_saved_json(
+    archive_path: Path,
+    dest: Path,
+    limits: ImportConfig,
+    *,
+    cancel_event: threading.Event | None = None,
+) -> None:
     try:
         archive = zipfile.ZipFile(archive_path)
     except zipfile.BadZipFile as exc:
@@ -132,6 +159,8 @@ def _extract_saved_json(archive_path: Path, dest: Path, limits: ImportConfig) ->
 
         total = 0
         for info in members:
+            if cancel_event is not None and cancel_event.is_set():
+                return
             _validate_member(info, limits)
             parts = _safe_parts(info.filename)
             target = dest.joinpath(*parts)
@@ -142,6 +171,8 @@ def _extract_saved_json(archive_path: Path, dest: Path, limits: ImportConfig) ->
             try:
                 with archive.open(info) as source, target.open("wb") as output:
                     while chunk := source.read(CHUNK_SIZE):
+                        if cancel_event is not None and cancel_event.is_set():
+                            return
                         total += len(chunk)
                         if total > limits.max_uncompressed_bytes:
                             raise ExportImportError(

@@ -68,7 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             with session_scope(session_factory) as session:
                 session.execute(
                     update(PipelineJob)
-                    .where(PipelineJob.status == "running")
+                    .where(PipelineJob.status.in_(("running", "cancelling")))
                     .values(
                         status="interrupted",
                         finished_at=utc_now_iso(),
@@ -82,6 +82,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             app.state.shutdown_event.set()
+
+            # Let every running job observe the shutdown as a cancellation.
+            with app.state.job_cancel_lock:
+                for cancel_event in app.state.job_cancel_events.values():
+                    cancel_event.set()
 
             while True:
                 with app.state.background_tasks_lock:
@@ -106,6 +111,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.background_tasks = set()
     app.state.background_tasks_lock = threading.Lock()
     app.state.shutdown_event = threading.Event()
+    app.state.job_cancel_events = {}
+    app.state.job_cancel_lock = threading.Lock()
 
     templates = Jinja2Templates(directory=WEB_DIR / "templates")
     app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")

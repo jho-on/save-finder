@@ -193,6 +193,22 @@
 				border-color: var(--brand-yellow);
 			}
 
+			.card button.stop-button {
+				background: var(--brand-pink);
+				border-color: var(--brand-pink);
+				color: #000000;
+			}
+
+			.card button.stop-button:hover {
+				background: var(--brand-yellow);
+				border-color: var(--brand-yellow);
+			}
+
+			.card button:disabled {
+				opacity: 0.6;
+				cursor: wait;
+			}
+
 			#drop-import {
 				border: 2px dashed var(--border);
 				border-radius: 8px;
@@ -488,6 +504,16 @@
 							<p>ou clique para selecionar um arquivo</p>
 						</div>
 
+						<button
+							type="button"
+							id="cancel-import"
+							class="stop-button"
+							hidden
+							onclick="cancelJob('import', getStoredJobs().import)"
+						>
+							Parar importação
+						</button>
+
 						<form
 							id="drop-form"
 							data-job-key="import"
@@ -626,6 +652,14 @@
 				pipeline: "res-pipeline",
 			};
 
+			const STOP_LABELS = {
+				import: "Parar importação",
+				enrich: "Parar enriquecimento",
+				download: "Parar download",
+				classify: "Parar classificação",
+				pipeline: "Parar pipeline completo",
+			};
+
 			const STAGE_LABELS = {
 				enrich: "Enriquecimento",
 				download: "Download",
@@ -652,6 +686,117 @@
 				const jobs = getStoredJobs();
 				delete jobs[key];
 				localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
+			}
+
+			function jobForm(key) {
+				return document.querySelector(
+					`form[data-job-key="${key}"]`,
+				);
+			}
+
+			function setJobUi(key, active, jobId) {
+				const form = jobForm(key);
+				const button = form?.querySelector('button[type="submit"]');
+
+				if (form) {
+					form.dataset.activeJob = active ? jobId : "";
+				}
+
+				if (button) {
+					if (!button.dataset.defaultLabel) {
+						button.dataset.defaultLabel =
+							button.textContent.trim();
+					}
+
+					button.textContent = active
+						? STOP_LABELS[key]
+						: button.dataset.defaultLabel;
+					button.classList.toggle("stop-button", active);
+					button.disabled = false;
+				}
+
+				if (key === "import") {
+					const drop = document.getElementById("drop-import");
+					const cancelImport =
+						document.getElementById("cancel-import");
+
+					if (drop) {
+						drop.style.display = active ? "none" : "";
+					}
+
+					if (cancelImport) {
+						cancelImport.hidden = !active;
+						cancelImport.disabled = false;
+						cancelImport.textContent = STOP_LABELS.import;
+					}
+
+					if (!active) {
+						const fileInput =
+							document.getElementById("hidden-file");
+
+						if (fileInput) fileInput.value = "";
+					}
+				}
+			}
+
+			function finishJobUi(key) {
+				setJobUi(key, false, null);
+			}
+
+			function cancelJob(key, jobId) {
+				if (!jobId) return;
+
+				const form = jobForm(key);
+				const button = form?.querySelector('button[type="submit"]');
+				const stopButton =
+					key === "import"
+						? document.getElementById("cancel-import")
+						: button;
+				const output = document.getElementById(JOB_OUTPUTS[key]);
+
+				if (stopButton) {
+					stopButton.disabled = true;
+					stopButton.textContent = "Parando...";
+				}
+
+				if (output) {
+					output.innerHTML = `
+                        <div class="job-message started">
+                            <strong>Parando...</strong> aguardando os itens em execução.
+                        </div>
+                    `;
+				}
+
+				fetch(
+					"/api/pipeline/" +
+						encodeURIComponent(jobId) +
+						"/cancel",
+					{ method: "POST" },
+				)
+					.then((response) => {
+						if (!response.ok) {
+							throw new Error("Falha ao parar operação");
+						}
+
+						return response.json();
+					})
+					.then((data) => {
+						if (!data.cancelled) {
+							pollJob(key, jobId);
+						}
+					})
+					.catch((error) => {
+						if (output) {
+							output.innerHTML = `
+                                <div class="job-message failed">
+                                    <strong>Falha ao parar:</strong>
+                                    ${escapeHtml(error.message)}
+                                </div>
+                            `;
+						}
+
+						setJobUi(key, true, jobId);
+					});
 			}
 
 			function escapeHtml(value) {
@@ -758,6 +903,7 @@
 				for (const [key, jobId] of Object.entries(jobs)) {
 					if (!JOB_OUTPUTS[key]) continue;
 
+					setJobUi(key, true, jobId);
 					pollJob(key, jobId);
 				}
 			}
@@ -768,6 +914,11 @@
 				const output = document.getElementById(outputId);
 
 				if (!key || !output) return;
+
+				if (formEl.dataset.activeJob) {
+					cancelJob(key, formEl.dataset.activeJob);
+					return;
+				}
 
 				const button = formEl.querySelector('button[type="submit"]');
 
@@ -792,6 +943,7 @@
 					})
 					.then((data) => {
 						saveJob(key, data.job_id);
+						setJobUi(key, true, data.job_id);
 
 						if (key === "pipeline") {
 							document.getElementById("pipeline-monitor").hidden =
@@ -801,6 +953,7 @@
 						pollJob(key, data.job_id);
 					})
 					.catch((error) => {
+						finishJobUi(key);
 						output.innerHTML = `
                 <div class="job-message failed">
                     <strong>Falha:</strong> ${escapeHtml(error.message)}
@@ -808,7 +961,9 @@
             `;
 					})
 					.finally(() => {
-						if (button) button.disabled = false;
+						if (button && !formEl.dataset.activeJob) {
+							button.disabled = false;
+						}
 					});
 			}
 
@@ -846,6 +1001,7 @@
 							) {
 								removeJob(key);
 								activePolls.delete(jobId);
+								finishJobUi(key);
 								loadStats();
 								return;
 							}
@@ -891,7 +1047,9 @@
 
 				const statusLabels = {
 					running: "Em execução",
+					cancelling: "Parando...",
 					done: "Concluído",
+					interrupted: "Interrompido",
 					error: "Erro",
 				};
 
@@ -1018,6 +1176,7 @@
 
 				const statusLabels = {
 					running: "Em execução",
+					cancelling: "Parando...",
 					done: "Pipeline concluído",
 					error: "Pipeline interrompido por erro",
 					interrupted: "Pipeline interrompido",

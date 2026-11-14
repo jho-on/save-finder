@@ -251,6 +251,19 @@ def _start_job(operation: str, session_factory, **params: object) -> str:
     return job_id
 
 
+def _register_cancel_event(state, job_id: str) -> threading.Event:
+    """Create the per-job event that pipeline workers poll to stop."""
+    cancel_event = threading.Event()
+    with state.job_cancel_lock:
+        state.job_cancel_events[job_id] = cancel_event
+    return cancel_event
+
+
+def _discard_cancel_event(state, job_id: str) -> None:
+    with state.job_cancel_lock:
+        state.job_cancel_events.pop(job_id, None)
+
+
 def _update_job(
     job_id: str,
     session_factory,
@@ -367,7 +380,7 @@ def _run_continuous_pipeline(
     settings: Settings,
     session_factory,
     platform: str | None = None,
-    shutdown_event: threading.Event | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     taxonomy = Taxonomy.load(settings.taxonomy_path)
     vision = build_vision(settings)
@@ -404,8 +417,8 @@ def _run_continuous_pipeline(
         running: dict[str, set[int]] = {stage: set() for stage in stages}
         futures: dict[Any, tuple[str, int]] = {}
 
-        def is_shutting_down() -> bool:
-            return shutdown_event is not None and shutdown_event.is_set()
+        def is_cancelled() -> bool:
+            return cancel_event is not None and cancel_event.is_set()
 
         def update_progress() -> None:
             stage_progress = {}
@@ -433,11 +446,11 @@ def _run_continuous_pipeline(
             )
 
         def submit_available(executors: dict[str, ThreadPoolExecutor]) -> None:
-            if is_shutting_down():
+            if is_cancelled():
                 return
 
             for stage in stages:
-                while queues[stage] and len(running[stage]) < workers and not is_shutting_down():
+                while queues[stage] and len(running[stage]) < workers and not is_cancelled():
                     item_id = queues[stage].popleft()
                     if stage == "enrich":
                         future = executors[stage].submit(
@@ -478,7 +491,7 @@ def _run_continuous_pipeline(
             update_progress()
 
             while any(queues[stage] for stage in stages) or futures:
-                if is_shutting_down():
+                if is_cancelled():
                     for stage in stages:
                         queues[stage].clear()
                 else:
@@ -503,7 +516,7 @@ def _run_continuous_pipeline(
                     if result.get("error"):
                         errors[stage] += 1
 
-                    if is_shutting_down():
+                    if is_cancelled():
                         continue
 
                     if stage == "enrich" and result.get("status") == ItemStatus.ENRICHED.value:
@@ -525,7 +538,7 @@ def _run_continuous_pipeline(
         _update_job(
             job_id,
             session_factory,
-            status="interrupted" if is_shutting_down() else "done",
+            status="interrupted" if is_cancelled() else "done",
             result={
                 stage: {
                     "completed": completed[stage],
@@ -559,6 +572,7 @@ def pipeline_import(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     job_id = _start_job("import", request.app.state.session_factory, platform=platform)
+    cancel_event = _register_cancel_event(request.app.state, job_id)
 
     def _run() -> None:
         try:
@@ -569,11 +583,12 @@ def pipeline_import(
                     path=upload_path,
                     tmp_dir=settings.paths.tmp,
                     limits=settings.import_config,
+                    cancel_event=cancel_event,
                 )
             _update_job(
                 job_id,
                 request.app.state.session_factory,
-                status="done",
+                status=("interrupted" if cancel_event.is_set() else "done"),
                 result={
                     "new": result.new,
                     "existing": result.existing,
@@ -589,6 +604,7 @@ def pipeline_import(
                 error=str(exc),
             )
         finally:
+            _discard_cancel_event(request.app.state, job_id)
             upload_path.unlink(missing_ok=True)
 
     _start_background_task(
@@ -607,6 +623,7 @@ def pipeline_enrich(
 ) -> dict[str, object]:
     settings = _settings(request)
     job_id = _start_job("enrich", request.app.state.session_factory, platform=platform)
+    cancel_event = _register_cancel_event(request.app.state, job_id)
 
     def _run() -> None:
         try:
@@ -625,13 +642,13 @@ def pipeline_enrich(
                     limit=None,
                     platform=platform,
                     progress_callback=_progress,
-                    shutdown_event=request.app.state.shutdown_event,
+                    shutdown_event=cancel_event,
                 )
 
             _update_job(
                 job_id,
                 request.app.state.session_factory,
-                status=("interrupted" if request.app.state.shutdown_event.is_set() else "done"),
+                status=("interrupted" if cancel_event.is_set() else "done"),
                 result={"total": report.total, "counts": report.counts},
             )
         except Exception as exc:
@@ -641,6 +658,8 @@ def pipeline_enrich(
                 status="error",
                 error=str(exc),
             )
+        finally:
+            _discard_cancel_event(request.app.state, job_id)
 
     _start_background_task(
         _run,
@@ -656,6 +675,7 @@ def _run_items_job(
     job_id: str,
     item_ids: Sequence[int],
     worker,
+    cancel_event: threading.Event,
     *,
     count_key: str | None = None,
 ) -> None:
@@ -679,7 +699,7 @@ def _run_items_job(
             futures: dict[Any, int] = {}
 
             def submit_available() -> None:
-                while len(futures) < max_workers and not request.app.state.shutdown_event.is_set():
+                while len(futures) < max_workers and not cancel_event.is_set():
                     try:
                         item_id = next(pending_items)
                     except StopIteration:
@@ -708,7 +728,7 @@ def _run_items_job(
         _update_job(
             job_id,
             request.app.state.session_factory,
-            status=("interrupted" if request.app.state.shutdown_event.is_set() else "done"),
+            status=("interrupted" if cancel_event.is_set() else "done"),
             result=payload,
         )
     except Exception as exc:
@@ -727,6 +747,7 @@ def pipeline_download(
 ) -> dict[str, object]:
     settings = _settings(request)
     job_id = _start_job("download", request.app.state.session_factory, platform=platform)
+    cancel_event = _register_cancel_event(request.app.state, job_id)
 
     with session_scope(request.app.state.session_factory) as session:
         query = select(Item.id).where(
@@ -741,7 +762,10 @@ def pipeline_download(
         return _download_one(item_id, settings, request.app.state.session_factory)
 
     def _run() -> None:
-        _run_items_job(request, job_id, item_ids, _worker)
+        try:
+            _run_items_job(request, job_id, item_ids, _worker, cancel_event)
+        finally:
+            _discard_cancel_event(request.app.state, job_id)
 
     _start_background_task(
         _run,
@@ -768,6 +792,7 @@ def pipeline_classify(
         platform=platform,
         reclassify=reclassify,
     )
+    cancel_event = _register_cancel_event(request.app.state, job_id)
 
     with session_scope(request.app.state.session_factory) as session:
         if reclassify:
@@ -794,7 +819,17 @@ def pipeline_classify(
         )
 
     def _run() -> None:
-        _run_items_job(request, job_id, item_ids, _worker, count_key="tags_emitted")
+        try:
+            _run_items_job(
+                request,
+                job_id,
+                item_ids,
+                _worker,
+                cancel_event,
+                count_key="tags_emitted",
+            )
+        finally:
+            _discard_cancel_event(request.app.state, job_id)
 
     _start_background_task(
         _run,
@@ -812,15 +847,19 @@ def pipeline_run(
 ) -> dict[str, object]:
     settings = _settings(request)
     job_id = _start_job("pipeline", request.app.state.session_factory, platform=platform)
+    cancel_event = _register_cancel_event(request.app.state, job_id)
 
     def _run() -> None:
-        _run_continuous_pipeline(
-            job_id,
-            settings,
-            session_factory=request.app.state.session_factory,
-            platform=platform,
-            shutdown_event=request.app.state.shutdown_event,
-        )
+        try:
+            _run_continuous_pipeline(
+                job_id,
+                settings,
+                session_factory=request.app.state.session_factory,
+                platform=platform,
+                cancel_event=cancel_event,
+            )
+        finally:
+            _discard_cancel_event(request.app.state, job_id)
 
     _start_background_task(
         _run,
@@ -829,6 +868,33 @@ def pipeline_run(
         name=f"pipeline-{job_id[:8]}",
     )
     return {"job_id": job_id, "status": "started", "operation": "pipeline"}
+
+
+@router.post("/pipeline/{job_id}/cancel")
+def pipeline_cancel(request: Request, job_id: str) -> dict[str, object]:
+    state = request.app.state
+    with session_scope(state.session_factory) as session:
+        job = session.get(PipelineJob, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="job not found")
+        if job.status not in ("running", "cancelling"):
+            return {"job_id": job_id, "status": job.status, "cancelled": False}
+
+    with state.job_cancel_lock:
+        cancel_event = state.job_cancel_events.get(job_id)
+
+    if cancel_event is None:
+        _update_job(
+            job_id,
+            state.session_factory,
+            status="interrupted",
+            error="Job stopped by user",
+        )
+        return {"job_id": job_id, "status": "interrupted", "cancelled": False}
+
+    cancel_event.set()
+    _update_job(job_id, state.session_factory, status="cancelling")
+    return {"job_id": job_id, "status": "cancelling", "cancelled": True}
 
 
 @router.get("/pipeline/stats")
