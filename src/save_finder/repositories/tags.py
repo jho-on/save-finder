@@ -18,6 +18,7 @@ from save_finder.models import (
     TagSource,
     utc_now_iso,
 )
+from save_finder.repositories.search import sync_search_index_item
 
 
 def excluded_tag_slugs(session: Session, item_id: int) -> set[str]:
@@ -173,6 +174,7 @@ def apply_manual_tag_selection(
         _add_exclusion(session, item_id, tag.id)
 
     session.flush()
+    sync_search_index_item(session, item_id)
     return len(target)
 
 
@@ -232,9 +234,9 @@ def add_item_tags(
                 selected_broad = definition.parent
                 break
 
-    if selected_broad is None:
-        return 0
-    if selected_broad in excluded:
+    if selected_broad is None or selected_broad in excluded:
+        session.flush()
+        sync_search_index_item(session, item_id)
         return 0
 
     target_slugs = {selected_broad}
@@ -288,6 +290,7 @@ def add_item_tags(
         )
         inserted += 1
     session.flush()
+    sync_search_index_item(session, item_id)
     return inserted
 
 

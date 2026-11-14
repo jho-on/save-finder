@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from save_finder.models import Embedding, Item, Transcript
 from save_finder.providers.base import TranscriptResult
+from save_finder.repositories.search import sync_search_index_item
 
 
 def save_transcript(session: Session, item_id: int, result: TranscriptResult) -> Transcript:
@@ -34,6 +35,7 @@ def save_transcript(session: Session, item_id: int, result: TranscriptResult) ->
         row.segments = segments
         row.model = result.model
     session.flush()
+    sync_search_index_item(session, item_id)
     return row
 
 

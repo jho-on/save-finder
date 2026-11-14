@@ -160,7 +160,7 @@ Aceite: 1.000 itens navegáveis, busca abaixo de 300 ms e edição de tag persis
 |---|---|
 | Unitário | normalização de URL, parser do export, taxonomia, fusão, regra pai-filho, contratos de provider, limpeza |
 | Integração | pipeline com providers e downloader falsos, sem rede, cobrindo vídeo, imagem e carrossel |
-| Manual | 30 itens do spike; 50 itens rotulados para acurácia, com pt e inglês e os três formatos |
+| Manual | 30 itens do spike, com pt e inglês e os três formatos |
 | Regressão | reimportar export, reclassificar do banco, item inválido, item sem mídia |
 
 Testes de rede e de modelo ficam marcados e fora do conjunto padrão. Nenhum teste depende de serviço externo.

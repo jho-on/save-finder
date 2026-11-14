@@ -77,6 +77,17 @@ def _load_taxonomy(settings: Settings) -> Taxonomy:
         raise typer.Exit(code=1) from exc
 
 
+@db_app.command("reindex")
+def db_reindex() -> None:
+    """Rebuild the derived FTS5 search index from source tables."""
+    settings = _settings()
+    from save_finder.repositories.search import rebuild_search_index
+
+    with _session_scope(settings) as session:
+        indexed = rebuild_search_index(session)
+    console.print(f"Search index rebuilt ({indexed} item(s)).")
+
+
 @db_app.command("init")
 def db_init() -> None:
     """Create directories, apply migrations and seed the taxonomy."""
@@ -89,10 +100,15 @@ def db_init() -> None:
         raise typer.Exit(code=1) from exc
 
     taxonomy = _load_taxonomy(settings)
+    from save_finder.repositories.search import rebuild_search_index
+
     with _session_scope(settings) as session:
         created, updated = sync_taxonomy(session, taxonomy)
+        indexed = rebuild_search_index(session)
+        session.commit()
 
     console.print(f"Database ready at [cyan]{settings.database.url}[/cyan]")
+    console.print(f"Search index rebuilt ({indexed} item(s)).")
     console.print(
         f"Taxonomy v{taxonomy.version}: {len(taxonomy.broad)} broad, "
         f"{len(taxonomy.specific)} specific ({created} created, {updated} updated)"
@@ -128,7 +144,10 @@ def db_reset(
         )
 
         settings = _settings()
+        from save_finder.repositories.search import clear_search_index
+
         with session_scope(make_session_factory(make_engine(settings))) as session:
+            clear_search_index(session)
             session.execute(delete(MediaAsset))
             session.execute(delete(Transcript))
             session.execute(delete(Embedding))

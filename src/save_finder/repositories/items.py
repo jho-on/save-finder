@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from save_finder.models import Item, ItemStatus, PlatformSource, PostType, Tag, utc_now_iso
 from save_finder.platforms.base import Metadata, SavedItem
+from save_finder.repositories.search import rebuild_search_index, sync_search_index_item
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +112,7 @@ def import_saved_items(
             break
 
     session.flush()
+    rebuild_search_index(session)
     return ImportStats(new=new, existing=existing)
 
 
@@ -173,6 +175,7 @@ def save_enrichment(
     item.enriched_at = utc_now_iso()
     item.updated_at = item.enriched_at
     session.flush()
+    sync_search_index_item(session, item.id)
 
 
 def mark_item_status(
