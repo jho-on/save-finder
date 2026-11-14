@@ -1,0 +1,368 @@
+basePath: /
+definitions:
+  auth.AccountResponse:
+    properties:
+      csrf_token:
+        example: p0K...
+        type: string
+      user:
+        $ref: '#/definitions/auth.UserResponse'
+    type: object
+  auth.AuthResponse:
+    properties:
+      csrf_token:
+        example: p0K...
+        type: string
+      user:
+        $ref: '#/definitions/auth.UserResponse'
+    type: object
+  auth.ChangePasswordRequest:
+    properties:
+      current_password:
+        example: s3cret-s3cret
+        type: string
+      new_password:
+        example: new-s3cret-s3cret
+        type: string
+      new_password_confirmation:
+        example: new-s3cret-s3cret
+        type: string
+    type: object
+  auth.DeleteAccountRequest:
+    properties:
+      password:
+        example: s3cret-s3cret
+        type: string
+    type: object
+  auth.LoginRequest:
+    properties:
+      identifier:
+        example: ana@example.com
+        type: string
+      password:
+        example: s3cret-s3cret
+        type: string
+      remember_me:
+        type: boolean
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        example: ana@example.com
+        type: string
+      password:
+        example: s3cret-s3cret
+        type: string
+      password_confirmation:
+        example: s3cret-s3cret
+        type: string
+      username:
+        example: ana
+        type: string
+    type: object
+  auth.SessionListResponse:
+    properties:
+      sessions:
+        items:
+          $ref: '#/definitions/auth.SessionResponse'
+        type: array
+    type: object
+  auth.SessionResponse:
+    properties:
+      absolute_expires_at:
+        type: string
+      created_at:
+        type: string
+      current:
+        type: boolean
+      id:
+        type: string
+      last_seen_at:
+        type: string
+      remember_me:
+        type: boolean
+      user_agent:
+        type: string
+    type: object
+  auth.UpdateAccountRequest:
+    properties:
+      email:
+        example: ana@example.com
+        type: string
+      username:
+        example: ana
+        type: string
+    type: object
+  auth.UserResponse:
+    properties:
+      created_at:
+        example: "2026-11-14T10:00:00Z"
+        type: string
+      email:
+        example: ana@example.com
+        type: string
+      id:
+        example: 3f6b0f4a-6f2d-4d4a-9c6c-1d8c0f0d2f7a
+        type: string
+      username:
+        example: ana
+        type: string
+    type: object
+  httpx.ErrorBody:
+    properties:
+      error:
+        $ref: '#/definitions/httpx.ErrorDetail'
+    type: object
+  httpx.ErrorDetail:
+    properties:
+      code:
+        example: invalid_credentials
+        type: string
+      message:
+        example: invalid credentials
+        type: string
+    type: object
+info:
+  contact: {}
+  description: 'API remota do SaveFinder: autenticação, persistência e sincronização.'
+  title: SaveFinder API
+  version: "1.0"
+paths:
+  /auth/account:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Current password for confirmation
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.DeleteAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Delete the account
+      tags:
+      - account
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AccountResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Get the current account
+      tags:
+      - account
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Fields to update (at least one)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.UpdateAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Update the account
+      tags:
+      - account
+  /auth/account/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Current and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Change the password
+      tags:
+      - account
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Log in
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: Log out of the current session
+      tags:
+      - auth
+  /auth/logout-all:
+    post:
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Log out of all sessions
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Register a new account
+      tags:
+      - auth
+  /auth/sessions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.SessionListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: List active sessions
+      tags:
+      - auth
+  /auth/sessions/{id}:
+    delete:
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Revoke a session
+      tags:
+      - auth
+schemes:
+- https
+swagger: "2.0"
