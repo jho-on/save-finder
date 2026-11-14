@@ -99,6 +99,10 @@ def test_api_items_and_search_filter_by_status(
     )
     session.add(imported)
     session.commit()
+    from save_finder.repositories.search import rebuild_search_index
+
+    rebuild_search_index(session)
+    session.commit()
 
     filtered = client.get("/api/items?status=pending").json()
     assert filtered["total"] == 1

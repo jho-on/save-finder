@@ -32,6 +32,7 @@ from save_finder.models import (
 )
 from save_finder.providers.base import LLMProvider, VisionProvider
 from save_finder.providers.factory import build_llm, build_vision
+from save_finder.repositories.search import search_items as fts_search
 from save_finder.repositories.tags import (
     apply_manual_tag_selection,
     excluded_tags_for_items,
@@ -222,26 +223,21 @@ def search_items(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict[str, object]:
-    like_term = f"%{q.lower()}%"
+    status_filter = None
+    if status is not None:
+        try:
+            status_filter = ItemStatus(status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"invalid status: {status}") from None
     with session_scope(request.app.state.session_factory) as session:
-        query = select(Item).where(
-            Item.caption.ilike(like_term)
-            | Item.author.ilike(like_term)
-            | Item.external_id.ilike(like_term)
+        rows, total = fts_search(
+            session,
+            q,
+            status=status_filter,
+            tag_slug=tag,
+            limit=limit,
+            offset=offset,
         )
-        if status is not None:
-            try:
-                query = query.where(Item.status == ItemStatus(status))
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"invalid status: {status}") from None
-        if tag is not None:
-            tag_id = session.scalar(select(Tag.id).where(Tag.slug == tag))
-            if tag_id is None:
-                return {"query": q, "items": [], "total": 0, "limit": limit, "offset": offset}
-            query = query.join(ItemTag, Item.id == ItemTag.item_id).where(ItemTag.tag_id == tag_id)
-
-        total = session.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
-        rows = session.scalars(query.order_by(Item.id.desc()).offset(offset).limit(limit)).all()
         item_ids = [row.id for row in rows]
         tags_map = _tags_for_items(session, item_ids)
         excluded_map = excluded_tags_for_items(session, item_ids)
