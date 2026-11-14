@@ -62,3 +62,7 @@ class MediaError(SaveFinderError):
 
 class ClassifierError(SaveFinderError):
     """Classification failed or produced an invalid result."""
+
+
+class InvalidTagSelection(SaveFinderError):
+    """A manual tag selection violates the closed taxonomy or parent rule."""

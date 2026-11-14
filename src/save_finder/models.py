@@ -148,6 +148,9 @@ class Item(Base):
     item_tags: Mapped[list[ItemTag]] = relationship(
         back_populates="item", cascade="all, delete-orphan"
     )
+    tag_exclusions: Mapped[list[ItemTagExclusion]] = relationship(
+        back_populates="item", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Item {self.platform}:{self.external_id} status={self.status}>"
@@ -251,6 +254,29 @@ class ItemTag(Base):
 
     item: Mapped[Item] = relationship(back_populates="item_tags")
     tag: Mapped[Tag] = relationship(back_populates="item_tags")
+
+
+class ItemTagExclusion(Base):
+    """A tag the user removed from an item.
+
+    The exclusion keeps automatic reclassification from reintroducing a tag
+    that was deliberately removed. It is cleared when the user selects the tag
+    again, or when a reclassification explicitly asks to restore removed tags.
+    """
+
+    __tablename__ = "item_tag_exclusions"
+    __table_args__ = (
+        UniqueConstraint("item_id", "tag_id", name="uq_item_tag_exclusions_item_tag"),
+        Index("ix_item_tag_exclusions_item_id", "item_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False, default=utc_now_iso)
+
+    item: Mapped[Item] = relationship(back_populates="tag_exclusions")
+    tag: Mapped[Tag] = relationship()
 
 
 class Run(Base):

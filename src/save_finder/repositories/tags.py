@@ -9,7 +9,171 @@ from sqlalchemy.orm import Session
 
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import load_settings
-from save_finder.models import ItemTag, Tag, TagLevel, TagSource, utc_now_iso
+from save_finder.errors import InvalidTagSelection
+from save_finder.models import (
+    ItemTag,
+    ItemTagExclusion,
+    Tag,
+    TagLevel,
+    TagSource,
+    utc_now_iso,
+)
+
+
+def excluded_tag_slugs(session: Session, item_id: int) -> set[str]:
+    """Return slugs the user removed from the item."""
+    return set(
+        session.scalars(
+            select(Tag.slug)
+            .join(ItemTagExclusion, ItemTagExclusion.tag_id == Tag.id)
+            .where(ItemTagExclusion.item_id == item_id)
+        ).all()
+    )
+
+
+def excluded_tags_for_items(session: Session, item_ids: Sequence[int]) -> dict[int, list[str]]:
+    """Batch-load excluded tag slugs for the library listing."""
+    result: dict[int, list[str]] = {item_id: [] for item_id in item_ids}
+    if not item_ids:
+        return result
+    rows = session.execute(
+        select(ItemTagExclusion.item_id, Tag.slug)
+        .join(Tag, Tag.id == ItemTagExclusion.tag_id)
+        .where(ItemTagExclusion.item_id.in_(item_ids))
+        .order_by(Tag.name)
+    ).all()
+    for item_id, slug in rows:
+        result.setdefault(item_id, []).append(slug)
+    return result
+
+
+def clear_item_tag_exclusions(
+    session: Session,
+    item_id: int,
+    *,
+    tag_slugs: Sequence[str] | None = None,
+) -> int:
+    """Allow automatic classification to emit the removed tags again."""
+    statement = delete(ItemTagExclusion).where(ItemTagExclusion.item_id == item_id)
+    if tag_slugs is not None:
+        tag_ids = select(Tag.id).where(Tag.slug.in_(tuple(tag_slugs)))
+        statement = statement.where(ItemTagExclusion.tag_id.in_(tag_ids))
+    result = session.execute(statement)
+    session.flush()
+    return result.rowcount or 0
+
+
+def _add_exclusion(session: Session, item_id: int, tag_id: int) -> None:
+    existing = session.scalar(
+        select(ItemTagExclusion.id).where(
+            ItemTagExclusion.item_id == item_id,
+            ItemTagExclusion.tag_id == tag_id,
+        )
+    )
+    if existing is None:
+        session.add(ItemTagExclusion(item_id=item_id, tag_id=tag_id))
+
+
+def apply_manual_tag_selection(
+    session: Session,
+    item_id: int,
+    tag_slugs: Sequence[str],
+    *,
+    taxonomy: Taxonomy | None = None,
+) -> int:
+    """Replace the item's selection while preserving automatic tags.
+
+    Tags that stay selected keep their previous source: an automatic tag the
+    user did not touch remains automatic and may be replaced by a future
+    reclassification. New tags become manual. Removed tags are recorded as
+    exclusions so automatic classification does not bring them back until the
+    user asks for it. Adding a manual specific tag locks its broad parent as
+    manual too, so a later reclassification cannot leave the specific tag
+    without the broad tag the parent rule requires.
+    """
+    taxonomy = taxonomy or Taxonomy.load(load_settings().taxonomy_path)
+    definitions = {tag.slug: tag for tag in (*taxonomy.broad, *taxonomy.specific)}
+
+    requested: list[str] = []
+    seen: set[str] = set()
+    for slug in tag_slugs:
+        if slug in seen:
+            continue
+        if slug not in definitions:
+            raise InvalidTagSelection(f"unknown tag: {slug}")
+        seen.add(slug)
+        requested.append(slug)
+
+    broad_requested = {slug for slug in requested if definitions[slug].is_broad}
+    parent_requested = {
+        definitions[slug].parent
+        for slug in requested
+        if not definitions[slug].is_broad and definitions[slug].parent is not None
+    }
+
+    if len(broad_requested) > 1:
+        raise InvalidTagSelection("select at most one broad tag")
+    if len(parent_requested) > 1:
+        raise InvalidTagSelection("specific tags must belong to the same broad tag")
+    if broad_requested and parent_requested and broad_requested != parent_requested:
+        raise InvalidTagSelection("specific tags must belong to the selected broad tag")
+
+    target = set(requested)
+    target.update(parent for parent in parent_requested if parent is not None)
+
+    tags_by_slug = {
+        tag.slug: tag for tag in session.scalars(select(Tag).where(Tag.slug.in_(target))).all()
+    }
+
+    current_rows = session.execute(
+        select(ItemTag, Tag).join(Tag, Tag.id == ItemTag.tag_id).where(ItemTag.item_id == item_id)
+    ).all()
+    current_by_slug = {tag.slug: (item_tag, tag) for item_tag, tag in current_rows}
+
+    newly_added: set[str] = set()
+    for slug in target:
+        tag = tags_by_slug.get(slug)
+        if tag is None:
+            continue
+        if slug not in current_by_slug:
+            session.add(
+                ItemTag(
+                    item_id=item_id,
+                    tag_id=tag.id,
+                    confidence=1.0,
+                    source=TagSource.MANUAL,
+                    evidence="manual selection",
+                )
+            )
+            newly_added.add(slug)
+        session.execute(
+            delete(ItemTagExclusion).where(
+                ItemTagExclusion.item_id == item_id,
+                ItemTagExclusion.tag_id == tag.id,
+            )
+        )
+
+    # A manually chosen specific tag implies its broad parent. If the parent
+    # was automatic, lock it as manual so a later reclassification cannot
+    # leave the specific tag without its broad tag.
+    for slug in newly_added:
+        parent = definitions[slug].parent
+        if parent is None or parent not in current_by_slug:
+            continue
+        item_tag, _ = current_by_slug[parent]
+        if item_tag.source != TagSource.MANUAL:
+            item_tag.source = TagSource.MANUAL
+            item_tag.confidence = 1.0
+            item_tag.evidence = "manual selection"
+
+    for slug, (item_tag, tag) in current_by_slug.items():
+        if slug in target:
+            continue
+        session.delete(item_tag)
+        _add_exclusion(session, item_id, tag.id)
+
+    session.flush()
+    return len(target)
 
 
 def add_item_tags(
@@ -31,10 +195,13 @@ def add_item_tags(
     """
     taxonomy = taxonomy or Taxonomy.load(load_settings().taxonomy_path)
     definitions = {tag.slug: tag for tag in (*taxonomy.broad, *taxonomy.specific)}
+    excluded = (
+        excluded_tag_slugs(session, item_id) if TagSource(source) == TagSource.AUTO else set()
+    )
 
     confidence_by_slug: dict[str, float] = {}
     for index, slug in enumerate(tag_slugs):
-        if slug not in definitions:
+        if slug not in definitions or slug in excluded:
             continue
         if confidences is not None and index < len(confidences):
             confidence_by_slug[slug] = confidences[index]
@@ -67,6 +234,8 @@ def add_item_tags(
 
     if selected_broad is None:
         return 0
+    if selected_broad in excluded:
+        return 0
 
     target_slugs = {selected_broad}
     target_slugs.update(
@@ -75,6 +244,7 @@ def add_item_tags(
         if not definition.is_broad
         and definition.parent == selected_broad
         and slug in confidence_by_slug
+        and slug not in excluded
     )
 
     broad_confidence = max(
@@ -129,12 +299,16 @@ def replace_auto_tags(
     confidences: Sequence[float] | None = None,
     evidence: str | None = None,
     taxonomy: Taxonomy | None = None,
+    restore_excluded: bool = False,
 ) -> int:
     """Replace automatic tags while preserving manual corrections.
 
     Reclassification must not accumulate stale automatic tags. Manual tags are
-    left untouched and continue to win over the new automatic result.
+    left untouched and continue to win over the new automatic result. Tags the
+    user removed stay excluded unless ``restore_excluded`` is true.
     """
+    if restore_excluded:
+        clear_item_tag_exclusions(session, item_id)
     session.execute(
         delete(ItemTag).where(
             ItemTag.item_id == item_id,
