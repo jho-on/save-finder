@@ -1,172 +1,70 @@
 # SaveFinder
 
-Biblioteca local e classificador de mídia salva em redes sociais.
-O Instagram é a primeira fonte, o núcleo é agnóstico de plataforma.
+Biblioteca e classificador de mídia salva em redes sociais (vídeos, imagens e
+carrosséis), com o Instagram como primeira fonte. O núcleo é agnóstico de
+plataforma. Vídeo, áudio e imagens originais existem apenas em diretórios
+temporários; o que persiste são thumbnail, transcrição, embedding, tags e
+metadados. Nada é escrito na plataforma de origem.
 
-Cada item é enriquecido, baixado apenas para um diretório temporário, analisado e classificado.
-A mídia original é apagada; persistem thumbnail, transcrição, embedding, tags e metadados.
-Nada é escrito na plataforma de origem.
+Este repositório é um **monorepo** com quatro aplicações independentes:
 
-## Requisitos
+| Aplicação | Tecnologia | Responsabilidade |
+|---|---|---|
+| [`apps/local`](apps/local) | Python | Aplicação local: CLI e interface web local. |
+| [`apps/api`](apps/api) | Go | API remota: autenticação, persistência e sincronização. |
+| [`apps/frontend/web`](apps/frontend/web) | Go + Templ | Interface web remota, consumindo a API. |
+| [`apps/frontend/android`](apps/frontend/android) | React Native + TypeScript | Aplicativo Android, consumindo a API. |
 
-- Python 3.11+
-- `ffmpeg` e `ffprobe` (fases de mídia)
-- `yt-dlp` (instalado como dependência; o binário do sistema é opcional)
+Não há compartilhamento de código entre as aplicações. A integração entre os
+clientes remotos e a API se dá por HTTP.
 
-## Instalação
+## Estrutura
 
-Com `uv`:
-
-```bash
-uv sync --extra dev
+```text
+apps/
+  local/             # Python: CLI + web local (SQLite, FastAPI)
+  api/               # Go: API remota (cmd/, internal/, migrations/)
+  frontend/
+    web/             # Go + Templ: interface web remota
+    android/         # React Native + TypeScript: app Android
+docs/
+  architecture/      # visão geral e documentos por produto
+  api/               # referência da API JSON local
+  development/       # setup e plano de implementação
 ```
-
-Com `venv` e `pip`:
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-```
-
-Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão:
-
-```bash
-uv sync --all-extras
-# ou, com venv e pip:
-.venv/bin/python -m pip install -e ".[dev,asr,vision,llm]"
-```
-
-O classificador usa três provedores locais, configurados em `config/settings.toml`:
-
-- **ASR** — `faster-whisper` transcreve o áudio com detecção automática de idioma.
-- **Visão** — `open-clip` gera o embedding das imagens/frames e das descrições das tags.
-- **LLM** — `ollama` classifica caption + transcrição dentro da taxonomia fechada.
-
-O padrão do LLM é `qwen3:8b`, com `think=false` e resposta limitada a 256 tokens
-para manter a classificação rápida em CPU. Se ele ainda não estiver no cache local,
-rode `ollama pull qwen3:8b`. Sem os extras instalados a classificação cai na heurística
-conservadora de palavras-chave, e o erro do provedor aparece no relatório.
-
-## Configuração
-
-Os padrões vivem em [`config/settings.toml`](config/settings.toml).  Variáveis de ambiente documentadas em
-[`.env.example`](.env.example) sobrescrevem banco, diretório de dados, taxonomia e o caminho
-do arquivo de configuração.
-
-A taxonomia fechada fica em [`config/taxonomy.yaml`](config/taxonomy.yaml), gerada a partir de
-[`docs/taxonomy.md`](docs/taxonomy.md). Nenhuma tag fora dessa lista pode ser emitida.
-
-## Uso
-
-```bash
-# uma vez: cria data/, aplica migrations e carrega a taxonomia
-.venv/bin/save-finder db init
-
-# sobe a API local
-.venv/bin/save-finder serve
-```
-
-Abra `http://127.0.0.1:8000/pipeline` e arraste o ZIP da exportação. É o caminho recomendado
-para uso manual: não precisa descompactar e o arquivo é apagado ao final. O painel acompanha
-importação, enriquecimento, download e classificação por etapas. A biblioteca fica em
-`/library` e as tags em `/tags`.
-
-A CLI faz a mesma importação sem abrir o navegador, útil para automação ou para processar
-vários arquivos:
-
-```bash
-# o 1º argumento é a plataforma; o 2º é o ZIP, a pasta `saved` ou um JSON
-.venv/bin/save-finder import instagram ~/Downloads/instagram-*.zip
-```
-
-O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens.
-
-```bash
-# busca metadados públicos e baixa a thumbnail dos itens pendentes
-.venv/bin/save-finder enrich --limit 30
-
-# tenta de novo somente os itens que ficaram com status `error`
-.venv/bin/save-finder enrich --retry-errors --limit 10
-
-# download das peças, áudio, keyframe, thumbnail e análise (transcrição/embedding)
-.venv/bin/save-finder download --limit 3
-
-# apenas baixar, sem carregar modelos de IA
-.venv/bin/save-finder download --limit 3 --no-analyze
-
-# classificação automática pelas tags da taxonomia
-.venv/bin/save-finder classify --limit 30
-
-# reclassificar do banco, sem baixar mídia nem acessar a rede
-.venv/bin/save-finder classify --reclassify --limit 30
-
-# incluir na reclassificação as tags removidas manualmente
-.venv/bin/save-finder classify --restore-removed --reclassify --limit 30
-
-# reconstrói o índice de busca (FTS5) a partir dos dados existentes
-.venv/bin/save-finder db reindex
-
-# contagens por status e plataforma
-.venv/bin/save-finder stats
-
-# valida a taxonomia
-.venv/bin/save-finder taxonomy validate
-
-# apaga o conteúdo, preservando schema e taxonomia (pede confirmação)
-.venv/bin/save-finder db reset
-```
-
-`enrich` grava autor, caption, tipo do post, número de peças, duração e o caminho local da
-thumbnail. A imagem de capa vai para `data/thumbs/`; nenhuma URL de CDN é persistida.
-Posts privados, removidos ou bloqueados ficam como `unavailable`; falhas nossas ficam como
-`error`. Reexecutar o comando pega apenas os itens ainda pendentes.
-
-`download` roda a análise antes de apagar o workspace: transcreve o áudio, gera um
-embedding agregado por item e grava ambos no banco. A mídia original continua sendo
-removida em `finally`. `classify` usa os sinais persistidos e grava tags com confiança
-e evidência; `--reclassify` substitui apenas tags automáticas antigas e preserva
-correções manuais.
-
-A busca da biblioteca cobre caption, autor, external_id, transcrição e tags, com ranking BM25
-sobre um índice FTS5 derivado. Importação, enriquecimento, análise e edição de tags mantêm o
-índice atualizado sozinhos; `db reindex` existe para refazê-lo do zero.
-
-A API expõe `GET /api/health`, listagem em `/api/items` e busca em `/api/items/search`, execução do pipeline em
-`POST /api/pipeline/*` e acompanhamento dos jobs. A referência completa está em
-[`docs/api.md`](docs/api.md); documentação interativa em `/docs`.
-
-### Export do Instagram
-
-Configurações → Central de Contas → Suas informações e permissões →
-Baixar suas informações → **Salvos** → JSON → todo o período.
-Envie o ZIP pela página inicial (ou aponte a CLI `import` para ele, para a pasta `saved`
-extraída ou para um JSON específico). O nome do arquivo não importa: o conteúdo é detectado,
-e arquivos fora de `saved`
-(curtidas, comentários) são ignorados.
-
-O parser ignora chaves localizadas: ele localiza o link do post, o autor e o timestamp pelos
-valores, e reconhece o nome da coleção por chaves equivalentes a “name”/“nome”/“nombre”.
-Reimportar o mesmo export não duplica itens. A extração acontece em `data/tmp/` e é apagada
-ao final, inclusive em caso de erro. Quando a exportação não traz o vínculo entre post e
-coleção, o campo de coleção fica vazio.
 
 ## Desenvolvimento
 
+Os requisitos e instruções de cada aplicação estão em
+[`docs/development/setup.md`](docs/development/setup.md). Comandos comuns pela
+raiz:
+
 ```bash
-make test        # pytest
-make lint        # ruff check
-make format      # ruff format
-make check       # lint + format check + testes
+make test           # testes de todas as aplicações
+make test-local     # testes do Local (pytest)
+make test-api       # testes da API (go test)
+make test-web       # testes do Web (go test)
+make test-android   # testes do Android (jest)
+make build          # verificações de build/importação de todas as aplicações
+make check          # lint/vet (Local: ruff; Go: go vet)
 ```
 
-Testes de rede e de modelo são marcados com `@pytest.mark.network` e
-`@pytest.mark.model` e não fazem parte do conjunto padrão.
+## Documentação
+
+- [`docs/architecture/overview.md`](docs/architecture/overview.md) — visão geral dos quatro produtos
+- [`docs/architecture/local.md`](docs/architecture/local.md) — SaveFinder Local
+- [`docs/architecture/api.md`](docs/architecture/api.md) — API remota
+- [`docs/architecture/frontend.md`](docs/architecture/frontend.md) — clientes remotos
+- [`docs/api/api.md`](docs/api/api.md) — referência da API JSON do Local
+- [`apps/local/README.md`](apps/local/README.md) — uso da aplicação local
 
 ## Restrições do projeto
 
-- Zero armazenamento permanente de mídia: original só em `data/tmp/`, apagado em `finally`.
-- Somente leitura nas plataformas: sem login, sessão ou API privada.
-- Aquisição apenas por exportação oficial ou URL explícita (`source=share|manual`).
-- Taxonomia fechada e versionada.
-- Núcleo sem código específico de rede fora de `platforms/<slug>.py`.
-- Conteúdo não é redistribuído.
+Valem para o monorepo inteiro; ver [`AGENTS.md`](AGENTS.md):
+
+1. Zero armazenamento permanente de mídia.
+2. Somente leitura nas plataformas.
+3. Aquisição apenas por exportação oficial ou URL explícita.
+4. Taxonomia fechada (`apps/local/config/taxonomy.yaml`).
+5. Núcleo agnóstico de plataforma.
+6. Conteúdo não é redistribuído.
