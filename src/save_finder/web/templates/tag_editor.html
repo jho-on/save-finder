@@ -1,0 +1,561 @@
+<div id="tag-editor" class="tag-editor" hidden>
+	<div class="tag-editor-backdrop" onclick="closeTagEditor()"></div>
+
+	<div
+		class="tag-editor-dialog"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="tag-editor-title"
+	>
+		<header class="tag-editor-header">
+			<div>
+				<h2 id="tag-editor-title">Editar tags</h2>
+				<p id="tag-editor-item" class="tag-editor-item"></p>
+			</div>
+			<button
+				type="button"
+				class="tag-editor-close"
+				aria-label="Fechar editor de tags"
+				onclick="closeTagEditor()"
+			>
+				×
+			</button>
+		</header>
+
+		<input
+			type="search"
+			id="tag-editor-search"
+			class="tag-editor-search"
+			placeholder="Buscar tag ampla ou específica..."
+			aria-label="Buscar tag"
+			oninput="filterTagEditor(this.value)"
+		/>
+
+		<div class="tag-editor-body">
+			<section>
+				<h3>Tag ampla</h3>
+				<p class="tag-editor-hint">
+					Tocar seleciona ou desmarca a ampla. A ampla pode ficar
+					sem subcategoria.
+				</p>
+				<div id="tag-editor-broad" class="tag-editor-options"></div>
+			</section>
+
+			<section id="tag-editor-specific-section" hidden>
+				<h3 id="tag-editor-specific-title">Subcategorias</h3>
+				<div id="tag-editor-specific" class="tag-editor-options"></div>
+			</section>
+		</div>
+
+		<p id="tag-editor-status" class="tag-editor-status" role="status"></p>
+
+		<footer class="tag-editor-footer">
+			<button type="button" class="tag-editor-cancel" onclick="closeTagEditor()">
+				Cancelar
+			</button>
+			<button
+				type="button"
+				id="tag-editor-save"
+				class="tag-editor-save"
+				onclick="saveTagEditor()"
+			>
+				Salvar tags
+			</button>
+		</footer>
+	</div>
+</div>
+
+<div id="broad-switch-modal" class="broad-switch-modal" hidden>
+	<div class="broad-switch-backdrop" onclick="closeBroadSwitchModal()"></div>
+
+	<div
+		class="broad-switch-dialog"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="broad-switch-title"
+	>
+		<h2 id="broad-switch-title">Só uma tag ampla por vez</h2>
+
+		<p class="broad-switch-text">
+			Já existe a ampla <strong id="broad-switch-from"></strong>
+			selecionada. Trocar para
+			<strong id="broad-switch-to"></strong> remove a anterior e todas as
+			subcategorias dela.
+		</p>
+
+		<label class="broad-switch-skip">
+			<input type="checkbox" id="broad-switch-skip" />
+			Não mostrar novamente, sempre remover a ampla anterior
+		</label>
+
+		<footer class="broad-switch-footer">
+			<button type="button" class="broad-switch-cancel" onclick="closeBroadSwitchModal()">
+				Cancelar
+			</button>
+			<button
+				type="button"
+				id="broad-switch-confirm"
+				class="broad-switch-confirm"
+				onclick="confirmBroadSwitch()"
+			>
+				Remover tag antiga
+			</button>
+		</footer>
+	</div>
+</div>
+
+<script>
+	(function () {
+		const state = {
+			itemId: null,
+			item: null,
+			broad: [],
+			specific: [],
+			selected: new Set(),
+			excluded: new Set(),
+			activeBroad: null,
+			search: "",
+			loading: false,
+			saving: false,
+		};
+
+		const taxonomyCache = { promise: null };
+		const BROAD_SWITCH_SKIP_KEY = "savefinder-tag-editor-skip-broad-warning";
+		let pendingBroadSwitch = null;
+		let loadSeq = 0;
+
+		function escapeHtml(value) {
+			return String(value ?? "").replace(
+				/[&<>"']/g,
+				(c) =>
+					({
+						"&": "&amp;",
+						"<": "&lt;",
+						">": "&gt;",
+						'"': "&quot;",
+						"'": "&#39;",
+					})[c],
+			);
+		}
+
+		function loadTaxonomy() {
+			if (!taxonomyCache.promise) {
+				taxonomyCache.promise = fetch("/api/taxonomy")
+					.then((response) => {
+						if (!response.ok) {
+							throw new Error("Falha ao carregar a taxonomia");
+						}
+
+						return response.json();
+					})
+					.then((data) => {
+						state.broad = (data.tags || [])
+							.filter((tag) => tag.level === "broad")
+							.map((tag) => ({
+								slug: tag.slug,
+								name: tag.name,
+								parent: tag.parent || null,
+							}));
+						state.specific = (data.tags || [])
+							.filter((tag) => tag.level === "specific")
+							.map((tag) => ({
+								slug: tag.slug,
+								name: tag.name,
+								parent: tag.parent || null,
+							}));
+					});
+			}
+
+			return taxonomyCache.promise;
+		}
+
+		function status(message, kind) {
+			const element = document.getElementById("tag-editor-status");
+			if (!element) return;
+			element.textContent = message || "";
+			element.className = "tag-editor-status" + (kind ? " " + kind : "");
+		}
+
+		function matches(tag) {
+			if (!state.search) return true;
+			const term = state.search.toLowerCase();
+			return (
+				tag.name.toLowerCase().includes(term) ||
+				tag.slug.toLowerCase().includes(term)
+			);
+		}
+
+		function broadMatches() {
+			const matchingSpecifics = state.specific.filter(matches);
+			return state.broad.filter(
+				(broad) =>
+					matches(broad) ||
+					matchingSpecifics.some(
+						(specific) => specific.parent === broad.slug,
+					),
+			);
+		}
+
+		function optionClass(slug, selected) {
+			const classes = ["tag-editor-option"];
+
+			if (selected || state.selected.has(slug)) {
+				classes.push("is-selected");
+			}
+
+			if (state.excluded.has(slug) && !state.selected.has(slug)) {
+				classes.push("is-excluded");
+			}
+
+			return classes.join(" ");
+		}
+
+		function renderBroad() {
+			const container = document.getElementById("tag-editor-broad");
+			const options = broadMatches();
+
+			if (!options.length) {
+				container.innerHTML = '<p class="tag-editor-empty">Nenhuma tag ampla encontrada.</p>';
+				return;
+			}
+
+			container.innerHTML = options
+				.map((tag) => {
+					const active = tag.slug === state.activeBroad;
+					const classes = [optionClass(tag.slug, active)];
+
+					if (active) classes.push("is-active");
+					if (state.selected.has(tag.slug)) classes.push("is-checked");
+
+					return (
+						'<button type="button" class="' +
+						classes.join(" ") +
+						'" data-slug="' +
+						escapeHtml(tag.slug) +
+						'" onclick="toggleBroadFromList(\'' +
+						escapeHtml(tag.slug) +
+						'\')">' +
+						escapeHtml(tag.name) +
+						"</button>"
+					);
+				})
+				.join("");
+		}
+
+		function renderSpecifics() {
+			const section = document.getElementById("tag-editor-specific-section");
+			const container = document.getElementById("tag-editor-specific");
+			const title = document.getElementById("tag-editor-specific-title");
+			const broad = state.broad.find((tag) => tag.slug === state.activeBroad);
+
+			if (!broad) {
+				section.hidden = true;
+				container.innerHTML = "";
+				return;
+			}
+
+			section.hidden = false;
+
+			const specifics = state.specific.filter(
+				(tag) => tag.parent === broad.slug && matches(tag),
+			);
+
+			title.textContent = "Subcategorias";
+
+			container.innerHTML = specifics.length
+				? specifics
+						.map((tag) => {
+							const classes = [optionClass(tag.slug, false)];
+							if (state.selected.has(tag.slug)) {
+								classes.push("is-checked");
+							}
+
+							return (
+								'<button type="button" class="' +
+								classes.join(" ") +
+								'" data-slug="' +
+								escapeHtml(tag.slug) +
+								'" onclick="toggleTagSpecific(\'' +
+								escapeHtml(tag.slug) +
+								'\')">' +
+								escapeHtml(tag.name) +
+								"</button>"
+							);
+						})
+						.join("")
+				: '<p class="tag-editor-empty">Nenhuma subcategoria encontrada.</p>';
+		}
+
+		function render() {
+			renderBroad();
+			renderSpecifics();
+		}
+
+		function groupSlugs(broadSlug) {
+			return state.specific
+				.filter((tag) => tag.parent === broadSlug)
+				.map((tag) => tag.slug);
+		}
+
+		function removeGroup(broadSlug) {
+			state.selected.delete(broadSlug);
+			groupSlugs(broadSlug).forEach((slug) => state.selected.delete(slug));
+		}
+
+		function toggleBroadFromList(slug) {
+			const selectedBroad =
+				state.broad.find((tag) => state.selected.has(tag.slug))?.slug ||
+				null;
+
+			// Clicking the active broad toggles it off.
+			if (state.selected.has(slug)) {
+				state.activeBroad = slug;
+				removeGroup(slug);
+				render();
+				return;
+			}
+
+			state.activeBroad = slug;
+
+			// Selecting a new broad while another is selected needs a confirmation,
+			// unless the user asked to skip it.
+			if (selectedBroad && selectedBroad !== slug) {
+				if (skipBroadSwitchWarning()) {
+					removeGroup(selectedBroad);
+					state.selected.add(slug);
+					render();
+					return;
+				}
+
+				pendingBroadSwitch = { from: selectedBroad, to: slug };
+				const from = state.broad.find((tag) => tag.slug === selectedBroad);
+				const to = state.broad.find((tag) => tag.slug === slug);
+				document.getElementById("broad-switch-from").textContent =
+					from ? from.name : selectedBroad;
+				document.getElementById("broad-switch-to").textContent = to
+					? to.name
+					: slug;
+				document.getElementById("broad-switch-skip").checked = false;
+				document.getElementById("broad-switch-modal").hidden = false;
+				render();
+				return;
+			}
+
+			state.selected.add(slug);
+			render();
+		}
+
+		function skipBroadSwitchWarning() {
+			try {
+				return localStorage.getItem(BROAD_SWITCH_SKIP_KEY) === "1";
+			} catch {
+				return false;
+			}
+		}
+
+		function setSkipBroadSwitchWarning() {
+			try {
+				localStorage.setItem(BROAD_SWITCH_SKIP_KEY, "1");
+			} catch {
+				// Private browsing: the warning simply keeps showing.
+			}
+		}
+
+		function closeBroadSwitchModal() {
+			document.getElementById("broad-switch-modal").hidden = true;
+			const pending = pendingBroadSwitch;
+			pendingBroadSwitch = null;
+			if (pending) {
+				const stillSelected =
+					state.broad.find((tag) => state.selected.has(tag.slug))?.slug ||
+					pending.from;
+				state.activeBroad = stillSelected;
+				render();
+			}
+		}
+
+		function confirmBroadSwitch() {
+			const pending = pendingBroadSwitch;
+			if (!pending) {
+				closeBroadSwitchModal();
+				return;
+			}
+
+			if (document.getElementById("broad-switch-skip").checked) {
+				setSkipBroadSwitchWarning();
+			}
+
+			removeGroup(pending.from);
+			state.selected.add(pending.to);
+			state.activeBroad = pending.to;
+			pendingBroadSwitch = null;
+
+			document.getElementById("broad-switch-modal").hidden = true;
+			render();
+		}
+
+		function toggleTagSpecific(slug) {
+			const tag = state.specific.find((item) => item.slug === slug);
+			if (!tag) return;
+
+			if (tag.parent && state.activeBroad !== tag.parent) {
+				state.activeBroad = tag.parent;
+			}
+
+			if (state.selected.has(slug)) {
+				state.selected.delete(slug);
+			} else {
+				state.selected.add(slug);
+				if (tag.parent) state.selected.add(tag.parent);
+			}
+
+			render();
+		}
+
+		function filterTagEditor(value) {
+			state.search = value || "";
+			render();
+		}
+
+		// Inline handlers rendered by renderBroad/renderSpecifics need globals.
+		window.toggleBroadFromList = toggleBroadFromList;
+		window.toggleTagSpecific = toggleTagSpecific;
+		window.closeBroadSwitchModal = closeBroadSwitchModal;
+		window.confirmBroadSwitch = confirmBroadSwitch;
+
+		window.openTagEditor = function (itemId) {
+			const seq = ++loadSeq;
+
+			state.itemId = itemId;
+			state.search = "";
+			state.selected = new Set();
+			state.excluded = new Set();
+			state.activeBroad = null;
+			state.loading = true;
+			state.saving = false;
+
+			const modal = document.getElementById("tag-editor");
+			const save = document.getElementById("tag-editor-save");
+			const search = document.getElementById("tag-editor-search");
+
+			modal.hidden = false;
+			save.disabled = true;
+			search.value = "";
+			document.getElementById("tag-editor-item").textContent = "Carregando...";
+			document.getElementById("tag-editor-broad").innerHTML = "";
+			document.getElementById("tag-editor-specific").innerHTML = "";
+			document.getElementById("tag-editor-specific-section").hidden = true;
+			status("");
+
+			Promise.all([
+				loadTaxonomy(),
+				fetch("/api/items/" + encodeURIComponent(itemId)).then((response) => {
+					if (!response.ok) {
+						throw new Error("Item não encontrado");
+					}
+
+					return response.json();
+				}),
+			])
+				.then(([, item]) => {
+					if (seq !== loadSeq) return;
+
+					state.item = item;
+					state.loading = false;
+					state.selected = new Set((item.tags || []).map((tag) => tag.slug));
+					state.excluded = new Set(item.excluded_tags || []);
+
+					document.getElementById("tag-editor-item").textContent =
+						item.title || item.external_id || "";
+
+					const selectedBroad = state.broad.find((tag) =>
+						state.selected.has(tag.slug),
+					);
+					const selectedSpecific = state.specific.find((tag) =>
+						state.selected.has(tag.slug),
+					);
+
+					state.activeBroad =
+						selectedBroad?.slug ||
+						selectedSpecific?.parent ||
+						state.broad[0]?.slug ||
+						null;
+
+					render();
+					save.disabled = false;
+					search.focus();
+				})
+				.catch((error) => {
+					if (seq !== loadSeq) return;
+					state.loading = false;
+					document.getElementById("tag-editor-item").textContent = "";
+					status(error.message || "Falha ao abrir o editor.", "error");
+				});
+		};
+
+		window.closeTagEditor = function () {
+			const modal = document.getElementById("tag-editor");
+			if (modal) modal.hidden = true;
+		};
+
+		window.saveTagEditor = function () {
+			if (!state.itemId || state.saving) return;
+
+			const save = document.getElementById("tag-editor-save");
+			state.saving = true;
+			save.disabled = true;
+			status("Salvando...");
+
+			// Selecting a specific tag always implies its broad parent.
+			state.specific.forEach((tag) => {
+				if (tag.parent && state.selected.has(tag.slug)) {
+					state.selected.add(tag.parent);
+				}
+			});
+
+			fetch("/api/items/" + encodeURIComponent(state.itemId) + "/tags", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ tags: Array.from(state.selected) }),
+			})
+				.then((response) =>
+					response.json().then((data) => ({
+						ok: response.ok,
+						data,
+					})),
+				)
+				.then(({ ok, data }) => {
+					if (!ok) {
+						throw new Error(data.detail || "Falha ao salvar as tags");
+					}
+
+					state.saving = false;
+					window.closeTagEditor();
+
+					if (typeof window.tagEditorOnSaved === "function") {
+						window.tagEditorOnSaved(data);
+					} else {
+						window.location.reload();
+					}
+				})
+				.catch((error) => {
+					state.saving = false;
+					save.disabled = false;
+					status(error.message || "Falha ao salvar as tags.", "error");
+				});
+		};
+
+		window.filterTagEditor = filterTagEditor;
+
+		document.addEventListener("keydown", (event) => {
+			if (event.key !== "Escape") return;
+			const switchModal = document.getElementById("broad-switch-modal");
+			if (switchModal && !switchModal.hidden) {
+				window.closeBroadSwitchModal();
+				return;
+			}
+			const modal = document.getElementById("tag-editor");
+			if (modal && !modal.hidden) window.closeTagEditor();
+		});
+	})();
+</script>

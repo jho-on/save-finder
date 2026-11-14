@@ -11,7 +11,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-		<title>Detalhe — {{ app_name }}</title>
+		<title>Detalhe, {{ app_name }}</title>
 
 		<link rel="stylesheet" href="/static/style.css" />
 
@@ -334,6 +334,14 @@
 					</p>
 					{% endif %}
 
+					<button
+						type="button"
+						class="edit-tags-button"
+						onclick="openTagEditor({{ item.id }})"
+					>
+						Editar tags
+					</button>
+
 					{% if tags %}
 					<ul class="tags-list">
 						{% for tag in tags %}
@@ -343,6 +351,7 @@
 							<span class="tag-confidence">
 								{{ tag.confidence }} · {{ tag.source }}
 							</span>
+
 						</li>
 						{% endfor %}
 					</ul>
@@ -352,5 +361,8 @@
 				</section>
 			</section>
 		</main>
+
+		{% include 'tag_editor.html' %}
+
 	</body>
 </html>

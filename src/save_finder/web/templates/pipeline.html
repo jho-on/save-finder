@@ -12,7 +12,7 @@
 
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Painel — {{ app_name }}</title>
+		<title>Painel, {{ app_name }}</title>
 		<link rel="stylesheet" href="/static/style.css" />
 
 		<style>
@@ -201,6 +201,106 @@
 			.card button:focus-visible {
 				outline: 3px solid var(--color-focus);
 				outline-offset: 3px;
+			}
+
+			.card form label.checkbox-label {
+				flex-direction: row;
+				align-items: center;
+				gap: 0.45rem;
+				font-weight: 600;
+			}
+
+			.card form label.checkbox-label[hidden],
+			.job-options-check[hidden] {
+				display: none;
+			}
+
+			.job-options {
+				position: fixed;
+				inset: 0;
+				z-index: 120;
+				display: grid;
+				place-items: center;
+				padding: 1rem;
+			}
+
+			.job-options[hidden] {
+				display: none;
+			}
+
+			.job-options-backdrop {
+				position: absolute;
+				inset: 0;
+				background: rgb(0 0 0 / 0.55);
+			}
+
+			.job-options-dialog {
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				gap: 0.85rem;
+				width: min(520px, 100%);
+				padding: 1.25rem;
+				background: var(--bg);
+				color: var(--fg);
+				border: 2px solid var(--border);
+				border-radius: 4px;
+				box-shadow: 8px 8px 0 var(--brand-pink);
+			}
+
+			.job-options-dialog h2 {
+				margin: 0;
+				font-size: 1.15rem;
+			}
+
+			.job-options-text {
+				margin: 0;
+				line-height: 1.5;
+				font-size: 0.9rem;
+			}
+
+			.job-options-check {
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+				font-size: 0.95rem;
+				font-weight: 600;
+				cursor: pointer;
+			}
+
+			.job-options-check input {
+				width: auto;
+				margin: 0;
+			}
+
+			.job-options-footer {
+				display: flex;
+				justify-content: flex-end;
+				gap: 0.6rem;
+			}
+
+			.job-options-footer button {
+				width: auto;
+				padding: 0.55rem 1rem;
+				border: 2px solid var(--border);
+				border-radius: 4px;
+				background: var(--surface);
+				color: var(--fg);
+				font: inherit;
+				font-weight: 800;
+				cursor: pointer;
+			}
+
+			.job-options-footer .job-options-confirm {
+				border-color: var(--color-primary);
+				background: var(--color-primary);
+				color: var(--on-primary);
+			}
+
+			.job-options-footer .job-options-confirm:hover {
+				background: var(--brand-pink);
+				border-color: var(--brand-pink);
+				color: var(--on-secondary);
 			}
 
 			#drop-import {
@@ -460,11 +560,11 @@
 							data-job-key="pipeline"
 							onsubmit="
 								event.preventDefault();
-								runPipeline(
-									'/api/pipeline/run',
-									new FormData(this),
-									this,
-								);
+								if (this.dataset.activeJob) {
+									cancelJob('pipeline', this.dataset.activeJob);
+								} else {
+									openJobOptionsModal('pipeline', this);
+								}
 								return false;
 							"
 						>
@@ -618,11 +718,12 @@
 						<form
 							data-job-key="classify"
 							onsubmit="
-								runPipeline(
-									'/api/pipeline/classify',
-									new FormData(this),
-									this,
-								);
+								event.preventDefault();
+								if (this.dataset.activeJob) {
+									cancelJob('classify', this.dataset.activeJob);
+								} else {
+									openJobOptionsModal('classify', this);
+								}
 								return false;
 							"
 						>
@@ -638,11 +739,109 @@
 					</article>
 				</div>
 			</section>
+
+		<div id="job-options" class="job-options" hidden>
+			<div class="job-options-backdrop" onclick="closeJobOptionsModal()"></div>
+
+			<div class="job-options-dialog" role="dialog" aria-modal="true" aria-labelledby="job-options-title">
+				<h2 id="job-options-title">Opções</h2>
+
+				<p class="job-options-text">Escolha como a classificação deve rodar. Sem estas opções, o lote classifica apenas itens ainda não classificados, e tags removidas manualmente não voltam.</p>
+
+				<label class="checkbox-label job-options-check">
+					<input type="checkbox" id="opt-reclassify" onchange="toggleRestoreRemovedModal(this.checked)" />
+					Reclassificar itens já classificados
+				</label>
+
+				<label class="checkbox-label job-options-check" id="opt-restore-label" hidden>
+					<input type="checkbox" id="opt-restore" />
+					Reclassificar também as tags removidas manualmente
+				</label>
+
+				<footer class="job-options-footer">
+					<button type="button" class="job-options-cancel" onclick="closeJobOptionsModal()">Cancelar</button>
+					<button type="button" id="job-options-confirm" class="job-options-confirm" onclick="confirmJobOptions()">Executar</button>
+				</footer>
+			</div>
+		</div>
 		</main>
 
 		<script>
 			const JOBS_STORAGE_KEY = "savefinder-pipeline-jobs";
 			const activePolls = new Set();
+
+			const JOB_OPTION_TARGETS = {
+				classify: {
+					url: "/api/pipeline/classify",
+					title: "Opções de classificação",
+					confirm: "Executar classificação",
+				},
+				pipeline: {
+					url: "/api/pipeline/run",
+					title: "Opções do pipeline completo",
+					confirm: "Executar pipeline completo",
+				},
+			};
+
+			let pendingOptionsForm = null;
+
+			function openJobOptionsModal(jobKey, form) {
+				const target = JOB_OPTION_TARGETS[jobKey];
+				if (!target) return;
+
+				pendingOptionsForm = { jobKey, form };
+				document.getElementById("job-options-title").textContent =
+					target.title;
+				document.getElementById("job-options-confirm").textContent =
+					target.confirm;
+				document.getElementById("opt-reclassify").checked = false;
+				document.getElementById("opt-restore").checked = false;
+				toggleRestoreRemovedModal(false);
+				document.getElementById("job-options").hidden = false;
+			}
+
+			function closeJobOptionsModal() {
+				document.getElementById("job-options").hidden = true;
+				pendingOptionsForm = null;
+			}
+
+			function toggleRestoreRemovedModal(checked) {
+				const label = document.getElementById("opt-restore-label");
+				const input = document.getElementById("opt-restore");
+
+				if (!label || !input) return;
+
+				label.hidden = !checked;
+
+				if (!checked) {
+					input.checked = false;
+				}
+			}
+
+			function confirmJobOptions() {
+				const pending = pendingOptionsForm;
+				if (!pending) return;
+
+				const target = JOB_OPTION_TARGETS[pending.jobKey];
+				const formData = new FormData(pending.form);
+				formData.set(
+					"reclassify",
+					document.getElementById("opt-reclassify").checked ? "true" : "false",
+				);
+				formData.set(
+					"restore_removed",
+					document.getElementById("opt-restore").checked ? "true" : "false",
+				);
+				closeJobOptionsModal();
+				runPipeline(target.url, formData, pending.form);
+			}
+
+			document.addEventListener("keydown", (event) => {
+				if (event.key === "Escape") {
+					const modal = document.getElementById("job-options");
+					if (modal && !modal.hidden) closeJobOptionsModal();
+				}
+			});
 
 			const JOB_OUTPUTS = {
 				import: "res-import",

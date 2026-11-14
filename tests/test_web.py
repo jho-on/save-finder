@@ -200,6 +200,118 @@ def test_tag_page_lists_specific_filters(client: TestClient, item: Item) -> None
     assert "Receitas" in response.text
 
 
+def test_api_update_item_tags_keeps_automatic_tags(client: TestClient, item: Item) -> None:
+    response = client.put(
+        f"/api/items/{item.id}/tags",
+        json={"tags": ["receitas", "drinks"]},
+    )
+    assert response.status_code == 200
+
+    body = response.json()
+    tags = {tag["slug"]: tag["source"] for tag in body["tags"]}
+    assert tags == {
+        "comida-e-bebida": "manual",
+        "receitas": "auto",
+        "drinks": "manual",
+    }
+    assert body["excluded_tags"] == []
+
+
+def test_api_update_item_tags_records_exclusions(client: TestClient, item: Item) -> None:
+    response = client.put(
+        f"/api/items/{item.id}/tags",
+        json={"tags": ["comida-e-bebida"]},
+    )
+    assert response.status_code == 200
+
+    detail = client.get(f"/api/items/{item.id}").json()
+    assert {tag["slug"] for tag in detail["tags"]} == {"comida-e-bebida"}
+    assert detail["excluded_tags"] == ["receitas"]
+
+    listing = client.get("/api/items?status=enriched").json()
+    assert listing["items"][0]["excluded_tags"] == ["receitas"]
+
+
+def test_api_update_item_tags_rejects_invalid_selection(client: TestClient, item: Item) -> None:
+    unknown = client.put(f"/api/items/{item.id}/tags", json={"tags": ["nope"]})
+    assert unknown.status_code == 400
+
+    two_broads = client.put(
+        f"/api/items/{item.id}/tags",
+        json={"tags": ["comida-e-bebida", "tecnologia"]},
+    )
+    assert two_broads.status_code == 400
+
+    assert client.put("/api/items/9999/tags", json={"tags": []}).status_code == 404
+
+
+def test_api_update_item_tags_removing_all_reverts_classified_status(
+    client: TestClient, item: Item, session: Session
+) -> None:
+    from save_finder.models import ItemStatus
+
+    item.status = ItemStatus.CLASSIFIED
+    session.commit()
+
+    response = client.put(f"/api/items/{item.id}/tags", json={"tags": []})
+    assert response.status_code == 200
+    assert response.json()["status"] == "analyzed"
+
+
+def test_item_page_exposes_tag_editor(client: TestClient, item: Item) -> None:
+    page = client.get(f"/item/{item.id}")
+    assert page.status_code == 200
+    assert "openTagEditor" in page.text
+    assert 'id="tag-editor"' in page.text
+    assert "broad-switch-modal" in page.text
+
+
+def test_pipeline_run_accepts_reclassify_options(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(api, "_start_background_task", lambda *args, **kwargs: None)
+    response = client.post(
+        "/api/pipeline/run",
+        data={
+            "platform": "instagram",
+            "reclassify": "true",
+            "restore_removed": "true",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["operation"] == "pipeline"
+
+    job = client.get(f"/api/pipeline/{body['job_id']}").json()
+    assert job["params"]["reclassify"] is True
+    assert job["params"]["restore_removed"] is True
+
+
+def test_pipeline_classify_options_are_recorded(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(api, "_start_background_task", lambda *args, **kwargs: None)
+    response = client.post(
+        "/api/pipeline/classify",
+        data={"platform": "instagram", "restore_removed": "true"},
+    )
+    assert response.status_code == 200
+    job = client.get(f"/api/pipeline/{response.json()['job_id']}").json()
+    assert job["params"]["restore_removed"] is True
+
+
+def test_api_taxonomy_exposes_closed_tag_list(client: TestClient) -> None:
+    response = client.get("/api/taxonomy")
+    assert response.status_code == 200
+
+    body = response.json()
+    broad = [tag for tag in body["tags"] if tag["level"] == "broad"]
+    specific = [tag for tag in body["tags"] if tag["level"] == "specific"]
+    assert body["version"] == 1
+    assert any(tag["slug"] == "comida-e-bebida" for tag in broad)
+    assert any(tag["slug"] == "receitas" and tag["parent"] == "comida-e-bebida" for tag in specific)
+
+
 def test_pipeline_start_and_status(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(api, "_start_background_task", lambda *args, **kwargs: None)
     response = client.post("/api/pipeline/enrich", data={"platform": "instagram"})

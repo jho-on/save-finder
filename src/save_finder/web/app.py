@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, inspect, select, update
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, aliased, sessionmaker
 
 from save_finder import __version__
 from save_finder.config import Settings, ensure_directories, load_settings
@@ -129,9 +129,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if item is None:
                 raise HTTPException(status_code=404, detail="item not found")
 
+            parent_tag = aliased(Tag)
             rows = session.execute(
-                select(ItemTag, Tag)
+                select(ItemTag, Tag, parent_tag.slug)
                 .join(Tag, Tag.id == ItemTag.tag_id)
+                .outerjoin(parent_tag, parent_tag.id == Tag.parent_id)
                 .where(ItemTag.item_id == item_id)
                 .order_by(Tag.level, Tag.name)
             ).all()
@@ -139,11 +141,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 {
                     "slug": tag.slug,
                     "name": tag.name,
+                    "level": tag.level.value,
+                    "parent": parent_slug,
                     "confidence": item_tag.confidence,
                     "source": item_tag.source.value,
                     "evidence": item_tag.evidence,
                 }
-                for item_tag, tag in rows
+                for item_tag, tag, parent_slug in rows
             ]
             method = web_api.classification_method(tag_list)
             evidence = next(

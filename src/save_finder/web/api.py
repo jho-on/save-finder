@@ -10,14 +10,16 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
+from sqlalchemy.orm import aliased
 
 from save_finder.classify.fuse import classify_persisted_item
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, ensure_directories
 from save_finder.db import session_scope
 from save_finder.enrich import enrich_items
-from save_finder.errors import ExportImportError
+from save_finder.errors import ExportImportError, InvalidTagSelection
 from save_finder.importer import copy_upload, import_export
 from save_finder.models import (
     Item,
@@ -30,11 +32,21 @@ from save_finder.models import (
 )
 from save_finder.providers.base import LLMProvider, VisionProvider
 from save_finder.providers.factory import build_llm, build_vision
-from save_finder.repositories.tags import replace_auto_tags
+from save_finder.repositories.tags import (
+    apply_manual_tag_selection,
+    excluded_tags_for_items,
+    replace_auto_tags,
+)
 
 router = APIRouter(prefix="/api", tags=["library"])
 
 _UNSET = object()
+
+
+class TagSelection(BaseModel):
+    """Final set of tags selected by the user in the editor."""
+
+    tags: list[str] = Field(default_factory=list)
 
 
 def _start_background_task(
@@ -103,7 +115,11 @@ def display_title(caption: str | None, external_id: str, limit: int = 120) -> st
     return text
 
 
-def _item_to_dict(item: Item, tags: Sequence[dict[str, object]] | None = None) -> dict[str, object]:
+def _item_to_dict(
+    item: Item,
+    tags: Sequence[dict[str, object]] | None = None,
+    excluded_tags: Sequence[str] | None = None,
+) -> dict[str, object]:
     thumb = item.thumb_path or None
     if thumb is not None and thumb.startswith("http"):
         thumb = None
@@ -126,6 +142,7 @@ def _item_to_dict(item: Item, tags: Sequence[dict[str, object]] | None = None) -
         "enriched_at": item.enriched_at,
         "classification_method": classification_method(tag_list),
         "tags": tag_list,
+        "excluded_tags": list(excluded_tags or []),
     }
 
 
@@ -133,18 +150,21 @@ def _tags_for_items(session, item_ids: Sequence[int]) -> dict[int, list[dict[str
     tags_map: dict[int, list[dict[str, object]]] = {}
     if not item_ids:
         return tags_map
+    parent_tag = aliased(Tag)
     rows = session.execute(
-        select(ItemTag, Tag)
+        select(ItemTag, Tag, parent_tag.slug)
         .join(Tag, ItemTag.tag_id == Tag.id)
+        .outerjoin(parent_tag, parent_tag.id == Tag.parent_id)
         .where(ItemTag.item_id.in_(item_ids))
         .order_by(Tag.level, Tag.name)
     ).all()
-    for item_tag, tag in rows:
+    for item_tag, tag, parent_slug in rows:
         tags_map.setdefault(item_tag.item_id, []).append(
             {
                 "slug": tag.slug,
                 "name": tag.name,
                 "level": tag.level.value,
+                "parent": parent_slug,
                 "confidence": item_tag.confidence,
                 "source": item_tag.source.value,
                 "evidence": item_tag.evidence,
@@ -179,9 +199,14 @@ def list_items(
 
         total = session.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
         rows = session.scalars(query.order_by(Item.id.desc()).offset(offset).limit(limit)).all()
-        tags_map = _tags_for_items(session, [row.id for row in rows])
+        item_ids = [row.id for row in rows]
+        tags_map = _tags_for_items(session, item_ids)
+        excluded_map = excluded_tags_for_items(session, item_ids)
         return {
-            "items": [_item_to_dict(item, tags_map.get(item.id)) for item in rows],
+            "items": [
+                _item_to_dict(item, tags_map.get(item.id), excluded_map.get(item.id))
+                for item in rows
+            ],
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -217,10 +242,15 @@ def search_items(
 
         total = session.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
         rows = session.scalars(query.order_by(Item.id.desc()).offset(offset).limit(limit)).all()
-        tags_map = _tags_for_items(session, [row.id for row in rows])
+        item_ids = [row.id for row in rows]
+        tags_map = _tags_for_items(session, item_ids)
+        excluded_map = excluded_tags_for_items(session, item_ids)
         return {
             "query": q,
-            "items": [_item_to_dict(item, tags_map.get(item.id)) for item in rows],
+            "items": [
+                _item_to_dict(item, tags_map.get(item.id), excluded_map.get(item.id))
+                for item in rows
+            ],
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -233,11 +263,63 @@ def get_item_detail(request: Request, item_id: int) -> dict[str, object]:
         item = session.get(Item, item_id)
         if item is None:
             raise HTTPException(status_code=404, detail="item not found")
-        result = _item_to_dict(item, _tags_for_items(session, [item_id]).get(item_id))
+        result = _item_to_dict(
+            item,
+            _tags_for_items(session, [item_id]).get(item_id),
+            excluded_tags_for_items(session, [item_id]).get(item_id),
+        )
         return result
 
 
-# Pipeline execution (fase 5 — background threads, not a durable worker queue)
+@router.put("/items/{item_id}/tags")
+def update_item_tags(request: Request, item_id: int, selection: TagSelection) -> dict[str, object]:
+    """Replace the user-visible tag selection of one item.
+
+    Tags kept from the automatic result stay automatic; new tags are manual and
+    removed tags become exclusions that reclassification must respect.
+    """
+    settings = _settings(request)
+    taxonomy = Taxonomy.load(settings.taxonomy_path)
+    with session_scope(request.app.state.session_factory) as session:
+        item = session.get(Item, item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="item not found")
+        try:
+            remaining = apply_manual_tag_selection(
+                session, item_id, selection.tags, taxonomy=taxonomy
+            )
+        except InvalidTagSelection as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        item.updated_at = utc_now_iso()
+        if remaining == 0 and item.status == ItemStatus.CLASSIFIED:
+            # No tags selected anymore: the item is no longer classified.
+            item.status = ItemStatus.ANALYZED
+        session.commit()
+        tags = _tags_for_items(session, [item_id]).get(item_id)
+        excluded = excluded_tags_for_items(session, [item_id]).get(item_id)
+        return _item_to_dict(item, tags, excluded)
+
+
+@router.get("/taxonomy")
+def get_taxonomy(request: Request) -> dict[str, object]:
+    """Expose the closed taxonomy for the manual tag editor."""
+    taxonomy = Taxonomy.load(_settings(request).taxonomy_path)
+    return {
+        "version": taxonomy.version,
+        "tags": [
+            {
+                "slug": tag.slug,
+                "name": tag.name,
+                "level": tag.level,
+                "parent": tag.parent,
+            }
+            for tag in taxonomy
+        ],
+    }
+
+
+# Pipeline execution (fase 5, background threads, not a durable worker queue)
 def _start_job(operation: str, session_factory, **params: object) -> str:
     job_id = str(uuid4())
     job = PipelineJob(
@@ -329,6 +411,8 @@ def _classify_one(
     session_factory,
     vision: VisionProvider | None = None,
     llm: LLMProvider | None = None,
+    *,
+    restore_removed: bool = False,
 ) -> dict[str, object]:
     with session_scope(session_factory) as session:
         item = session.get(Item, item_id)
@@ -343,6 +427,7 @@ def _classify_one(
             confidences=result.confidences,
             evidence=result.evidence,
             taxonomy=taxonomy,
+            restore_excluded=restore_removed,
         )
 
         item.status = ItemStatus.CLASSIFIED
@@ -381,6 +466,9 @@ def _run_continuous_pipeline(
     session_factory,
     platform: str | None = None,
     cancel_event: threading.Event | None = None,
+    *,
+    reclassify: bool = False,
+    restore_removed: bool = False,
 ) -> None:
     taxonomy = Taxonomy.load(settings.taxonomy_path)
     vision = build_vision(settings)
@@ -395,11 +483,19 @@ def _run_continuous_pipeline(
                 Item.status == ItemStatus.ENRICHED,
                 ~Item.id.in_(select(MediaAsset.item_id)),
             )
-            classify_query = select(Item.id).where(
-                Item.status.in_((ItemStatus.ENRICHED, ItemStatus.ANALYZED)),
-                Item.id.in_(select(MediaAsset.item_id)),
-                ~Item.id.in_(select(ItemTag.item_id)),
-            )
+            if reclassify:
+                classify_query = select(Item.id).where(
+                    Item.status.in_(
+                        (ItemStatus.ENRICHED, ItemStatus.ANALYZED, ItemStatus.CLASSIFIED)
+                    ),
+                    Item.id.in_(select(MediaAsset.item_id)),
+                )
+            else:
+                classify_query = select(Item.id).where(
+                    Item.status.in_((ItemStatus.ENRICHED, ItemStatus.ANALYZED)),
+                    Item.id.in_(select(MediaAsset.item_id)),
+                    ~Item.id.in_(select(ItemTag.item_id)),
+                )
 
             if platform is not None:
                 enrich_query = enrich_query.where(Item.platform == platform)
@@ -468,6 +564,7 @@ def _run_continuous_pipeline(
                             session_factory,
                             vision,
                             llm,
+                            restore_removed=restore_removed,
                         )
                     futures[future] = (stage, item_id)
                     running[stage].add(item_id)
@@ -781,6 +878,7 @@ def pipeline_classify(
     request: Request,
     platform: Annotated[str | None, Form()] = None,
     reclassify: Annotated[bool, Form()] = False,
+    restore_removed: Annotated[bool, Form()] = False,
 ) -> dict[str, object]:
     settings = _settings(request)
     taxonomy = Taxonomy.load(settings.taxonomy_path)
@@ -791,6 +889,7 @@ def pipeline_classify(
         request.app.state.session_factory,
         platform=platform,
         reclassify=reclassify,
+        restore_removed=restore_removed,
     )
     cancel_event = _register_cancel_event(request.app.state, job_id)
 
@@ -816,6 +915,7 @@ def pipeline_classify(
             request.app.state.session_factory,
             vision,
             llm,
+            restore_removed=restore_removed,
         )
 
     def _run() -> None:
@@ -844,9 +944,17 @@ def pipeline_classify(
 def pipeline_run(
     request: Request,
     platform: Annotated[str | None, Form()] = None,
+    reclassify: Annotated[bool, Form()] = False,
+    restore_removed: Annotated[bool, Form()] = False,
 ) -> dict[str, object]:
     settings = _settings(request)
-    job_id = _start_job("pipeline", request.app.state.session_factory, platform=platform)
+    job_id = _start_job(
+        "pipeline",
+        request.app.state.session_factory,
+        platform=platform,
+        reclassify=reclassify,
+        restore_removed=restore_removed,
+    )
     cancel_event = _register_cancel_event(request.app.state, job_id)
 
     def _run() -> None:
@@ -857,6 +965,8 @@ def pipeline_run(
                 session_factory=request.app.state.session_factory,
                 platform=platform,
                 cancel_event=cancel_event,
+                reclassify=reclassify,
+                restore_removed=restore_removed,
             )
         finally:
             _discard_cancel_event(request.app.state, job_id)
@@ -954,6 +1064,7 @@ def pipeline_status(request: Request, job_id: str) -> dict[str, object]:
             "job_id": job.id,
             "operation": job.operation,
             "status": job.status,
+            "params": job.params,
             "started_at": job.started_at,
             "finished_at": job.finished_at,
             "result": job.result,

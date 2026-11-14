@@ -11,7 +11,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-		<title>Tag — {{ app_name }}</title>
+		<title>Tag, {{ app_name }}</title>
 
 		<link rel="stylesheet" href="/static/style.css" />
 
@@ -183,10 +183,8 @@
 				gap: 1rem;
 			}
 
-			.grid > a {
+			.grid > article {
 				display: block;
-				color: var(--fg);
-				text-decoration: none;
 			}
 
 			.card {
@@ -209,9 +207,15 @@
 					border-color 0.15s;
 			}
 
-			.grid > a:hover .card {
+			.grid > article:hover .card {
 				transform: translateY(-3px);
 				border-bottom-color: var(--brand-pink);
+			}
+
+			.card-link {
+				display: block;
+				color: var(--fg);
+				text-decoration: none;
 			}
 
 			.grid .card img {
@@ -377,7 +381,7 @@
 				<h1>Tag: {{ tag_name }}</h1>
 
 				<p class="lede">
-					{{ tag_slug }} — {{ count }} itens
+					{{ tag_slug }}, {{ count }} itens
 				</p>
 			</header>
 
@@ -522,7 +526,7 @@
 							c.innerHTML = "<p>Nenhum resultado.</p>";
 
 							document.getElementById("page-info").textContent =
-								"—";
+								"-";
 							document.getElementById("prev-button").disabled =
 								true;
 							document.getElementById("next-button").disabled =
@@ -619,9 +623,10 @@
 														: "";
 
 									return (
-										'<a href="/item/' +
+										'<article class="card">' +
+										'<a class="card-link" href="/item/' +
 										i.id +
-										'"><article class="card">' +
+										'">' +
 										(thumb
 											? '<img src="' +
 												thumb +
@@ -649,7 +654,11 @@
 										"</span>" +
 										classification +
 										"</p>" +
-										"</article></a>"
+										"</a>" +
+										'<button type="button" class="edit-tags-button" onclick="openTagEditor(' +
+										i.id +
+										')">Editar tags</button>' +
+										"</article>"
 									);
 								})
 								.join("") +
@@ -675,7 +684,13 @@
 				}
 			}
 
+			window.tagEditorOnSaved = function () {
+				hxt(buildUrl(currentOffset));
+			};
+
 			hxt(buildUrl(0));
 		</script>
+
+		{% include 'tag_editor.html' %}
 	</body>
 </html>

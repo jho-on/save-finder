@@ -177,7 +177,7 @@ def import_export_command(
         console.print(f"[red]Import error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    table = Table(title=f"Import — {platform}")
+    table = Table(title=f"Import, {platform}")
     table.add_column("Result")
     table.add_column("Count", justify="right")
     table.add_row("New", str(result.new))
@@ -237,7 +237,7 @@ def enrich_command(
         table.add_row(
             outcome.external_id,
             outcome.status,
-            outcome.post_type or "—",
+            outcome.post_type or "-",
             str(outcome.media_count),
             "yes" if outcome.thumbnail_saved else "no",
             str(outcome.elapsed_ms),
@@ -246,7 +246,7 @@ def enrich_command(
     console.print(table)
 
     summary = ", ".join(f"{status}: {count}" for status, count in sorted(report.counts.items()))
-    console.print(f"Enriched {report.total} item(s) — {summary}")
+    console.print(f"Enriched {report.total} item(s), {summary}")
 
 
 @app.command("download")
@@ -323,6 +323,13 @@ def classify_command(
             help="Re-run classification from persisted transcript/embedding.",
         ),
     ] = False,
+    restore_removed: Annotated[
+        bool,
+        typer.Option(
+            "--restore-removed",
+            help="Allow reclassification to re-add tags removed manually.",
+        ),
+    ] = False,
 ) -> None:
     """Classify items with AI signals and the closed taxonomy (Fase 4)."""
     settings = _settings()
@@ -367,6 +374,7 @@ def classify_command(
                     confidences=result.confidences,
                     evidence=result.evidence,
                     taxonomy=taxonomy,
+                    restore_excluded=restore_removed,
                 )
                 total_tags += inserted
                 item.status = ItemStatus.CLASSIFIED
@@ -374,12 +382,12 @@ def classify_command(
                 session.commit()
                 table.add_row(
                     item.external_id,
-                    ", ".join(result.tags) or "—",
-                    result.evidence or "—",
+                    ", ".join(result.tags) or "-",
+                    result.evidence or "-",
                     result.error or "",
                 )
             console.print(table)
-            console.print(f"Classified {len(items)} item(s) — {total_tags} tag(s) emitted")
+            console.print(f"Classified {len(items)} item(s), {total_tags} tag(s) emitted")
     except SaveFinderError as exc:
         console.print(f"[red]Classification error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
@@ -411,7 +419,7 @@ def taxonomy_validate() -> None:
     settings = _settings()
     taxonomy = _load_taxonomy(settings)
     console.print(
-        f"Taxonomy v{taxonomy.version} OK — {len(taxonomy.broad)} broad, "
+        f"Taxonomy v{taxonomy.version} OK, {len(taxonomy.broad)} broad, "
         f"{len(taxonomy.specific)} specific, {len(taxonomy)} total."
     )
 
