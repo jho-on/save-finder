@@ -24,6 +24,7 @@ htmlcov/
 *.local.md
 
 # Dados locais: banco, thumbnails, temporários, cookies
+# (casa em qualquer nível, ex.: apps/local/data/)
 data/
 cookies.txt
 *.session
@@ -35,6 +36,25 @@ models/
 .cache/
 *.log
 logs/
+
+# Go
+apps/api/api
+apps/frontend/web/web
+
+# Node / React Native
+node_modules/
+.npm/
+npm-debug.log*
+coverage/
+
+# Android
+.gradle/
+local.properties
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+.cxx/
 
 # Editores e SO
 .idea/

@@ -1,8 +1,8 @@
 # AGENTS.md
 
 Guia operacional para agentes de código que trabalharem neste repositório.
-Leia também [`docs/implementation-plan.md`](docs/implementation-plan.md) antes de implementar qualquer fase.
-O cronograma, as metas e o rumo futuro ficam em `docs/roadmap.local.md`, que não é versionado e pode não existir em outra máquina.
+Leia também [`docs/development/implementation-plan.md`](docs/development/implementation-plan.md) antes de implementar qualquer fase.
+O cronograma, as metas e o rumo futuro ficam em `docs/development/roadmap.local.md`, que não é versionado e pode não existir em outra máquina.
 
 ## Visão geral
 
@@ -17,11 +17,11 @@ A mídia nunca é arquivada. O que persiste é thumbnail, transcrição, embeddi
 
 Valem em qualquer versão do projeto:
 
-1. **Zero armazenamento permanente de mídia.** Vídeo, áudio e imagens originais existem apenas em `data/tmp/`, com remoção garantida em `finally`, inclusive em erro, timeout ou Ctrl-C. Thumbnail é a única imagem que persiste.
+1. **Zero armazenamento permanente de mídia.** Vídeo, áudio e imagens originais existem apenas em `apps/local/data/tmp/`, com remoção garantida em `finally`, inclusive em erro, timeout ou Ctrl-C. Thumbnail é a única imagem que persiste.
 2. **Somente leitura nas plataformas.** Nada de login, senha, sessão autenticada, API privada, curtir, salvar, criar coleção ou remover itens.
 3. **Aquisição apenas por meios suportados.** Exportação oficial ou entrada explícita de URL (`source=share|manual`). Nada de scraping de páginas ou endpoints internos.
-4. **Taxonomia fechada.** O classificador só pode emitir tags presentes em `config/taxonomy.yaml`.
-5. **Núcleo agnóstico de plataforma.** Nenhum código específico de uma rede fora de `src/save_finder/platforms/<slug>.py`.
+4. **Taxonomia fechada.** O classificador só pode emitir tags presentes em `apps/local/config/taxonomy.yaml`.
+5. **Núcleo agnóstico de plataforma.** Nenhum código específico de uma rede fora de `apps/local/src/save_finder/platforms/<slug>.py`.
 6. **Conteúdo não é redistribuído.** Sem recursos de publicação ou compartilhamento do material baixado.
 
 O escopo da versão atual (local, um único usuário, um dispositivo) está definido no plano e pode mudar. A evolução prevista é o mesmo usuário em vários dispositivos — não multiusuário. Autenticação de usuário único e acesso remoto devem entrar como camadas; multi-tenancy está fora de escopo.
@@ -64,33 +64,40 @@ O `core` não conhece Instagram, YouTube nem TikTok. Ele fala com um `PlatformAd
 | LLM | `LLMProvider`; Ollama como padrão local |
 | Testes | pytest + ruff |
 
-Modelos, providers e versões ficam em `config/settings.toml`. Sem build step de frontend; Node não é usado no runtime.
+Modelos, providers e versões ficam em `apps/local/config/settings.toml`. Sem build step de frontend; Node não é usado no runtime.
 
 ## Estrutura do repositório
+
+Monorepo com quatro aplicações independentes. Cada uma tem seu próprio
+gerenciamento de dependências; não há código compartilhado. A integração entre
+clientes remotos e a API é por HTTP.
 
 ```
 .
 ├── AGENTS.md
 ├── README.md
+├── Makefile               # delega comandos para cada app
+├── docs/
+│   ├── architecture/      # overview, local, api, frontend, taxonomy
+│   ├── api/               # api.md (API JSON local)
+│   └── development/       # setup.md, implementation-plan.md, roadmap.local.md (gitignored)
+├── apps/
+│   ├── local/             # Python: aplicação existente (CLI + web local)
+│   ├── api/               # Go: API remota
+│   └── frontend/
+│       ├── web/           # Go + Templ: interface web remota
+│       └── android/       # React Native + TypeScript: app Android
+└── ...
+```
+
+Estrutura interna de `apps/local`:
+
+```
+apps/local/
 ├── pyproject.toml
 ├── alembic.ini
 ├── Makefile
 ├── .env.example
-├── docs/
-│   ├── implementation-plan.md
-│   ├── taxonomy.md
-│   ├── api.md
-│   └── roadmap.local.md   # gitignored
-├── config/
-│   ├── settings.toml
-│   └── taxonomy.yaml
-├── data/                  # gitignored
-│   ├── save-finder.db
-│   ├── thumbs/
-│   └── tmp/
-├── migrations/            # Alembic
-│   ├── env.py
-│   └── versions/
 ├── src/save_finder/
 │   ├── cli.py
 │   ├── config.py
@@ -125,13 +132,28 @@ Modelos, providers e versões ficam em `config/settings.toml`. Sem build step de
 │       ├── api.py         # rotas JSON
 │       ├── templates/
 │       └── static/
+├── config/
+│   ├── settings.toml
+│   └── taxonomy.yaml
+├── data/                  # gitignored
+│   ├── save-finder.db
+│   ├── thumbs/
+│   └── tmp/
+├── migrations/            # Alembic
+│   ├── env.py
+│   └── versions/
 └── tests/
     └── fixtures/
 ```
 
 ## Comandos
 
+A aplicação local vive em `apps/local` (os comandos abaixo assumem `cd apps/local`;
+na raiz, `make test-local`, `make check-local` etc. delegam para lá):
+
 ```bash
+cd apps/local
+
 uv sync --extra dev             # alternativa: python -m venv .venv && pip install -e ".[dev]"
 uv sync --all-extras            # com as dependências locais de IA (asr, vision, llm)
 
@@ -169,14 +191,14 @@ uv run ruff check . && uv run ruff format --check .
 - Um item com falha não interrompe o lote: registrar status e seguir.
 - Timeout por item: 180 s no download, 300 s na análise.
 - Concorrência máxima de download: 3, com jitter entre requisições.
-- Remover arquivos temporários em `finally` e verificar `data/tmp` no início e no fim do lote.
+- Remover arquivos temporários em `finally` e verificar `apps/local/data/tmp` no início e no fim do lote.
 - Logs estruturados por item (`platform`, `external_id`, etapa, duração, resultado). Nunca logar cookie.
 - Modelos, prompts e taxonomia versionados em config. Mudança deve permitir reprocessar a partir de `transcripts` + `embeddings`, sem rede.
 - A transcrição detecta o idioma automaticamente; não fixar pt-BR. O conteúdo pode estar em qualquer idioma.
 
 ## Adicionando uma plataforma
 
-1. Implementar `PlatformAdapter` em `src/save_finder/platforms/<slug>.py`:
+1. Implementar `PlatformAdapter` em `apps/local/src/save_finder/platforms/<slug>.py`:
    - `parse_export(path)` → `Iterable[SavedItem]`
    - `normalize_url(url)` → `(permalink, external_id)`
    - `enrich(item)` → `Metadata`
@@ -221,7 +243,7 @@ Exemplos: `feat(platforms): add instagram export parser`, `fix(pipeline): remove
 ## Testes
 
 - Fixtures reais de export por plataforma, incluindo chaves localizadas.
-- Obrigatórios: normalização de URL, parser do export, validação da taxonomia, regra pai-filho, limpeza de `data/tmp` em falha.
+- Obrigatórios: normalização de URL, parser do export, validação da taxonomia, regra pai-filho, limpeza de `apps/local/data/tmp` em falha.
 - Rede e modelo marcados com `@pytest.mark.network` / `@pytest.mark.model`; não rodam no CI padrão.
 - Nenhum teste depende de Ollama, yt-dlp ou das plataformas.
 
@@ -237,7 +259,7 @@ Exemplos: `feat(platforms): add instagram export parser`, `fix(pipeline): remove
 
 ## Referências
 
-- Plano detalhado: [`docs/implementation-plan.md`](docs/implementation-plan.md)
-- Taxonomia inicial: [`docs/taxonomy.md`](docs/taxonomy.md)
-- Execução local (não versionada): `docs/roadmap.local.md`
+- Plano detalhado: [`docs/development/implementation-plan.md`](docs/development/implementation-plan.md)
+- Taxonomia inicial: [`docs/architecture/taxonomy.md`](docs/architecture/taxonomy.md)
+- Execução local (não versionada): `docs/development/roadmap.local.md`
 - Export do Instagram: Configurações → Central de Contas → Suas informações e permissões → Baixar suas informações → **Salvos** → JSON → todo o período.
