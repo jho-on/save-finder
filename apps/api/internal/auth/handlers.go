@@ -26,7 +26,10 @@ type Handler struct {
 	IPRisk       *ratelimit.RiskLimiter
 	IdentityLim  *ratelimit.IdentityLimiter
 	SensitiveLim *ratelimit.IdentityLimiter
-	Logger       *slog.Logger
+	// ReadLim backs RequireAuthRead (library read routes). May be nil,
+	// in which case the general identity limiter applies.
+	ReadLim *ratelimit.IdentityLimiter
+	Logger  *slog.Logger
 
 	// Keys is wired for the atomic password-change-with-rewrap flow.
 	// May be nil (then re-wrap requests fail closed).
@@ -36,12 +39,16 @@ type Handler struct {
 }
 
 // NewHandler creates a Handler and precomputes the dummy hash used to
-// equalize timing between unknown users and wrong passwords.
+// equalize timing between unknown users and wrong passwords. A dedicated
+// read limiter for the library read routes may be passed (optional).
 func NewHandler(u *users.Store, s *sessions.Store, cookieSecure bool,
 	ipRisk *ratelimit.RiskLimiter, identityLim, sensitiveLim *ratelimit.IdentityLimiter,
-	logger *slog.Logger, keysStore *keys.Store) *Handler {
+	logger *slog.Logger, keysStore *keys.Store, readLim ...*ratelimit.IdentityLimiter) *Handler {
 	h := &Handler{Users: u, Sessions: s, CookieSecure: cookieSecure,
 		IPRisk: ipRisk, IdentityLim: identityLim, SensitiveLim: sensitiveLim, Logger: logger, Keys: keysStore}
+	if len(readLim) > 0 {
+		h.ReadLim = readLim[0]
+	}
 	// Precompute to avoid leaking timing differences on unknown identifiers.
 	h.dummyHash, _ = password.DummyHash()
 	return h

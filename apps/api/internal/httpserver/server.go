@@ -15,6 +15,7 @@ import (
 
 	"save-finder/api/internal/auth"
 	"save-finder/api/internal/keys"
+	"save-finder/api/internal/library"
 
 	_ "save-finder/api/docs"
 )
@@ -24,6 +25,7 @@ type Deps struct {
 	Logger       *slog.Logger
 	Handler      *auth.Handler
 	Crypto       *keys.Handler
+	Library      *library.Handler
 	Ready        func(ctx context.Context) error
 	TrustProxy   bool
 	SwaggerRoute bool
@@ -82,6 +84,28 @@ func New(d Deps) http.Handler {
 			}
 		})
 	})
+
+	if libHandler := d.Library; libHandler != nil {
+		r.Route("/library", func(r chi.Router) {
+			// Reads get the dedicated, more generous limiter.
+			r.Group(func(r chi.Router) {
+				r.Use(h.RequireAuthRead)
+				r.Get("/items", libHandler.List)
+				r.Get("/items/{key}", libHandler.Get)
+				r.Get("/items/{key}/thumb", libHandler.GetThumb)
+				r.Get("/manifest", libHandler.Manifest)
+			})
+			// Mutations keep CSRF + the sensitive limiter (wipe) or the
+			// general identity limiter (batch push).
+			r.Group(func(r chi.Router) {
+				r.Use(h.RequireAuth)
+				r.Use(h.CSRF)
+				r.Post("/items/batch", libHandler.Batch)
+			})
+		})
+		// Exact "/library" path (no trailing slash): delete everything.
+		r.With(h.RequireAuth, h.CSRF, h.SensitiveLimit).Delete("/library", libHandler.Wipe)
+	}
 
 	if d.SwaggerRoute {
 		r.Get("/swagger/*", httpswagger.WrapHandler)
