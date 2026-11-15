@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from save_finder import __version__
 from save_finder.classify.taxonomy import Taxonomy
 from save_finder.config import Settings, load_settings
 from save_finder.models import Item, ItemStatus, PlatformSource, PostType
@@ -48,7 +49,7 @@ def test_health(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["version"] == "0.1.0"
+    assert body["version"] == __version__
     assert body["platforms"] == ["instagram"]
 
 
