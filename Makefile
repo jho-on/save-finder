@@ -1,7 +1,10 @@
 # SaveFinder monorepo — comandos comuns.
 # Cada alvo delega para a aplicação correspondente.
 
-.PHONY: test test-local test-api test-web test-android build build-local build-api build-web build-android check check-local check-api check-web
+.PHONY: test test-local test-api test-web test-android build build-local build-api build-web build-android check check-local check-api check-web setup-ai
+
+setup-ai:
+	$(MAKE) -C apps/local setup-ai
 
 test: test-local test-api test-web test-android
 

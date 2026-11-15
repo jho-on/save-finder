@@ -21,6 +21,7 @@ const (
 	CodeInternal            = "internal_error"
 	CodeKeyMetadataNotFound = "key_metadata_not_found"
 	CodeKeyMetadataExists   = "key_metadata_exists"
+	CodeLibraryItemNotFound = "library_item_not_found"
 )
 
 // ErrorDetail is the machine-readable part of an error response.

@@ -9,10 +9,19 @@ Cada componente versiona no seu próprio ciclo. As tags Git seguem o formato
 
 | Componente | Tag | Estado atual |
 |---|---|---|
-| Local (CLI) | `local/vX.Y.Z` | declara `0.1.0` |
-| API | `api/vX.Y.Z` | sem versão |
-| Web | `web/vX.Y.Z` | sem versão |
+| Local (CLI) | `local/vX.Y.Z` | declara `0.10.0` (tag `local/v0.10.0` a criar no merge em `main`) |
+| API | `api/vX.Y.Z` | `0.2.0` (tag `api/v0.2.0` a criar no merge em `main`) |
+| Web | `web/vX.Y.Z` | `0.2.0` (tag `web/v0.2.0` a criar no merge em `main`) |
 | Mobile (Android) | `mobile/vX.Y.Z` | fontes de versão divergentes |
+
+Changelog resumido a anexar nas tags:
+
+- `local/v0.10.0`, `api/v0.2.0`, `web/v0.2.0` (2026-11-15): upload E2EE da biblioteca para o remoto.
+  Novos comandos `save-finder remote push` e `remote wipe` (upsert idempotente, DEK só em memória);
+  novos endpoints `POST /library/items/batch`, `GET /library/items`, `GET /library/items/{key}`,
+  `GET /library/items/{key}/thumb`, `GET /library/manifest`, `DELETE /library` (com senha);
+  web com casca única de leitura (`/`), busca client-side, cache IndexedDB (ciphertext only),
+  paginação numerada e badge de método de classificação com popover humanizado.
 
 Regras:
 

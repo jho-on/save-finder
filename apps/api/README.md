@@ -1,6 +1,6 @@
 # SaveFinder API
 
-API remota do SaveFinder: autenticação, persistência e sincronização.
+API remota do SaveFinder: autenticação e persistência cifrada (E2EE) da biblioteca.
 
 ## Requisitos
 
@@ -12,6 +12,8 @@ API remota do SaveFinder: autenticação, persistência e sincronização.
 ```text
 cmd/api/        ponto de entrada do binário
 internal/       código privado da aplicação
+  keys/       metadados E2EE (DEK/KEK) e validação de blobs opacos
+  library/    armazenamento E2EE da biblioteca (itens cifrados + thumb)
   auth/         handlers, middleware e hashing Argon2id
   config/       configuração via variáveis de ambiente
   db/           pool pgx e migrations goose
@@ -97,12 +99,26 @@ servidas com Swagger UI em `/swagger/` quando `cmd/api` roda. Resumo:
 | `PUT /auth/account/password` | Troca a senha (re-wrap atômico da DEK, se informado); revoga as demais sessões |
 | `GET /auth/crypto` | Metadados da chave E2EE do usuário (404 se ainda não criada) |
 | `POST /auth/crypto` | Armazena a DEK cifrada + parâmetros KDF (uma vez por conta; 409 se já existe) |
+| `POST /library/items/batch` | Upsert E2EE de até 50 itens (`{item_key, payload[, transcript][, thumb]}` em base64); idempotente |
+| `GET /library/items?limit=&cursor=` | Lista paginada (keyset) de `item_key` + `payload` (sem transcript/thumb) |
+| `GET /library/items/{key}` | Detalhe de um item (`payload` + `transcript`) |
+| `GET /library/items/{key}/thumb` | Bytes cifrados da thumbnail (download opaco) |
+| `GET /library/manifest` | Lista leve `(item_key, updated_at)` para caches de cliente |
+| `DELETE /library` | Apaga **todos** os itens da biblioteca remota; exige senha atual no body |
 | `GET /healthz` / `GET /readyz` | Liveness / readiness (ping no banco) |
+
+As rotas de leitura da biblioteca (`GET /library/*`) usam um limiter dedicado
+mais generoso (600 req/min por usuário) para comportar thumbs lazy-loaded;
+`DELETE /library` cai no limiter sensível (10 req/min). Todas as respostas de
+`/library` vão com `Cache-Control: no-store`. O único campo em claro é
+`item_key` (`platform:external_id`), necessário para upsert idempotente e
+paginação keyset; todo o resto (payload, transcript, thumb) é ciphertext
+XChaCha20-Poly1305 produzido e consumido apenas pelos clientes.
 
 Erros: `{"error":{"code":"...","message":"..."}}` — códigos estáveis:
 `validation_failed`, `invalid_credentials`, `email_taken`, `username_taken`,
 `unauthorized`, `session_expired`, `csrf_invalid`, `not_found`,
-`key_metadata_not_found`, `key_metadata_exists`,
+`key_metadata_not_found`, `key_metadata_exists`, `library_item_not_found`,
 `rate_limited`, `internal_error`.
 
 ## Criptografia ponta a ponta (E2EE)

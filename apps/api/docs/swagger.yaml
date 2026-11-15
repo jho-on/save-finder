@@ -171,6 +171,85 @@ definitions:
         example: e3dyYXBwZWQ=
         type: string
     type: object
+  library.BatchItem:
+    properties:
+      item_key:
+        example: instagram:ABC123
+        type: string
+      payload:
+        example: base64-ciphertext
+        type: string
+      thumb:
+        type: string
+      transcript:
+        type: string
+    type: object
+  library.BatchRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/library.BatchItem'
+        type: array
+    type: object
+  library.BatchResponse:
+    properties:
+      upserted:
+        type: integer
+    type: object
+  library.DetailResponse:
+    properties:
+      item_key:
+        type: string
+      payload:
+        type: string
+      transcript:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  library.ListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/library.listItemJSON'
+        type: array
+      next_cursor:
+        type: string
+    type: object
+  library.ManifestResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/library.manifestEntryJSON'
+        type: array
+    type: object
+  library.WipeRequest:
+    properties:
+      password:
+        example: s3cret-s3cret
+        type: string
+    type: object
+  library.WipeResponse:
+    properties:
+      deleted:
+        type: integer
+    type: object
+  library.listItemJSON:
+    properties:
+      item_key:
+        type: string
+      payload:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  library.manifestEntryJSON:
+    properties:
+      item_key:
+        type: string
+      updated_at:
+        type: string
+    type: object
 info:
   contact: {}
   description: 'API remota do SaveFinder: autenticação, persistência e sincronização.'
@@ -465,6 +544,165 @@ paths:
       summary: Revoke a session
       tags:
       - auth
+  /library:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Current password for confirmation
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/library.WipeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/library.WipeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - cookieAuth: []
+      summary: Delete every library item of the account
+      tags:
+      - library
+  /library/items:
+    get:
+      parameters:
+      - description: Page size (default 100, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Opaque keyset cursor
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/library.ListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - cookieAuth: []
+      summary: List encrypted library items (paginated)
+      tags:
+      - library
+  /library/items/{key}:
+    get:
+      parameters:
+      - description: item_key (platform:external_id)
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/library.DetailResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - cookieAuth: []
+      summary: Get one encrypted library item
+      tags:
+      - library
+  /library/items/{key}/thumb:
+    get:
+      parameters:
+      - description: item_key (platform:external_id)
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - cookieAuth: []
+      summary: Get the encrypted thumbnail of a library item
+      tags:
+      - library
+  /library/items/batch:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Up to 50 encrypted items
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/library.BatchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/library.BatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - cookieAuth: []
+      summary: Upsert a batch of encrypted library items
+      tags:
+      - library
+  /library/manifest:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/library.ManifestResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - cookieAuth: []
+      summary: Manifest of the encrypted library (for client-side caches)
+      tags:
+      - library
 schemes:
 - https
 swagger: "2.0"

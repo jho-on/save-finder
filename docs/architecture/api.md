@@ -6,8 +6,8 @@ Aplicação Go em [`apps/api`](../../apps/api).
 
 - API remota do SaveFinder.
 - Autenticação de usuário único.
-- Persistência dos dados do usuário no servidor.
-- Sincronização entre dispositivos.
+- Persistência cifrada (E2EE) da biblioteca; espelho read-only consumido
+  pelos clientes remotos. Nunca decifra nem processa o conteúdo.
 
 ## Relação com as demais aplicações
 

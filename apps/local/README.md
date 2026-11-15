@@ -28,13 +28,28 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 ```
 
-Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão:
+Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão.
+O caminho mais fácil é o alvo de setup, que instala os extras e baixa o modelo do Ollama:
+
+```bash
+make setup-ai   # na raiz do monorepo ou em apps/local
+```
+
+Ou manualmente:
 
 ```bash
 uv sync --all-extras
 # ou, com venv e pip:
 .venv/bin/python -m pip install -e ".[dev,asr,vision,llm]"
 ```
+
+Para conferir se as IAs estão instaladas e acessíveis (e o que falta), rode:
+
+```bash
+save-finder doctor
+```
+
+O mesmo status aparece no painel de processamento (`/pipeline`), no cartão "IAs locais".
 
 O classificador usa três provedores locais, configurados em `config/settings.toml`:
 
@@ -120,6 +135,13 @@ uv run save-finder connect            # API padrão http://localhost:8080
 uv run save-finder connect --url http://localhost:8080
 # ou: SAVE_FINDER_API_URL=http://localhost:8080 uv run save-finder connect
 
+# envia a biblioteca local criptografada (E2EE) para a API remota
+uv run save-finder remote push        # pede a senha; upsert idempotente
+uv run save-finder remote push --limit 10   # envia só 10 itens (teste)
+
+# apaga TUDO que foi enviado à API remota (pede confirmação + senha)
+uv run save-finder remote wipe
+
 # apaga o conteúdo, preservando schema e taxonomia (pede confirmação)
 uv run save-finder db reset
 ```
@@ -130,6 +152,16 @@ aberta localmente e salva a sessão em `data/credentials.json` (modo 0600,
 gitignored): cookie, `csrf_token`, expiração e URL da API. A senha e as chaves
 nunca tocam o disco. A API padrão é `http://localhost:8080`; sobrescreva com
 `--url` ou `SAVE_FINDER_API_URL`.
+
+`remote push` envia a biblioteca inteira para a API remota, **cifrada de ponta a ponta**:
+pede a senha (só nesta operação), abre a DEK localmente, empacota cada item
+(metadados, tags, peças, transcrição e a thumbnail local) e sobe em lotes por
+`POST /library/items/batch`. O upsert é idempotente por `(plataforma, id externo)` —
+pode repetir à vontade. O remoto nunca vê o conteúdo em claro; só o identificador
+opaco `plataforma:external_id` trafega aberto. Embeddings não são enviados.
+
+`remote wipe` apaga todos os itens guardados no remoto (`DELETE /library`); exige
+a senha atual. Os dados locais não são tocados.
 
 `enrich` grava autor, caption, tipo do post, número de peças, duração e o caminho local da
 thumbnail. A imagem de capa vai para `data/thumbs/`; nenhuma URL de CDN é persistida.
