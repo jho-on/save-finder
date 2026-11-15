@@ -1,3 +1,4 @@
+
 name: API
 
 on:
@@ -75,3 +76,124 @@ jobs:
 
       - name: test (unit + integration against PostgreSQL)
         run: go test ./...
+
+  deploy:
+    name: Deploy API
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Deployment
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: "production",
+              auto_merge: false,
+              required_contexts: [],
+              production_environment: true,
+              transient_environment: false,
+              task: "deploy",
+              description: "Deploy da API"
+            });
+
+            core.setOutput("id", deployment.data.id);
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: "in_progress",
+              description: "Implantando API"
+            });
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+
+      - name: Build Linux AMD64
+        working-directory: apps/api
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: go build -trimpath -ldflags="-s -w" -o save-finder-api ./cmd/api
+
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: Configure known hosts
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload binary
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          scp -o StrictHostKeyChecking=yes \
+            apps/api/save-finder-api \
+            "$VPS_USER@$VPS_HOST:/opt/save-finder/api/save-finder-api.new"
+
+      - name: Restart API and check health
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" '
+            set -eu
+
+            mv /opt/save-finder/api/save-finder-api.new \
+               /opt/save-finder/api/save-finder-api
+
+            chmod 755 /opt/save-finder/api/save-finder-api
+
+            sudo systemctl restart save-finder-api
+
+            for attempt in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8081/healthz >/dev/null; then
+                echo "API healthy"
+                exit 0
+              fi
+              sleep 2
+            done
+
+            sudo journalctl -u save-finder-api -n 50 --no-pager
+            exit 1
+          '
+
+      - name: Update Deployment status
+        if: always() && steps.deployment.outputs.id != ''
+        uses: actions/github-script@v7
+        env:
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: Number(process.env.DEPLOYMENT_ID),
+              state: "${{ job.status }}" === "success" ? "success" : "failure",
+              description: "${{ job.status }}" === "success"
+                ? "API implantada com sucesso"
+                : "Falha na implantação da API",
+              log_url: process.env.RUN_URL
+            });
