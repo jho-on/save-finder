@@ -62,3 +62,4 @@ local.properties
 .DS_Store
 Thumbs.db
 desktop.ini
+docs/development/local/

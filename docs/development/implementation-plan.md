@@ -2,7 +2,7 @@
 
 > Nome do projeto: **SaveFinder** (slug `save-finder`).
 > Este documento registra escopo e decisões — não implementação.
-> Cronograma, metas e rumo futuro ficam em `roadmap.local.md`, fora do git.
+> Cronograma, metas e rumo futuro ficam em `docs/development/local/roadmap.local.md`, fora do git.
 > Regras permanentes estão em [`AGENTS.md`](../AGENTS.md).
 
 ## 1. Objetivo

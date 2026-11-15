@@ -4,6 +4,15 @@ Requisitos e instruções por aplicação. A partir da raiz do monorepo, o
 `Makefile` delega os comandos para cada app (`make test-local`, `make
 test-api`, `make test-web`, `make test-android`, `make build`).
 
+## CI
+
+Cada componente (menos o Android) tem workflow próprio de CI, rodando em
+PRs e pushes para `develop`/`main` com filtros de path. A API roda testes de
+integração contra PostgreSQL 16 (service container) e falha se o banco não
+estiver disponível; a Web valida que os templates gerados estão sincronizados.
+Versionamento e compatibilidade: [versioning.md](versioning.md),
+[compatibility.md](compatibility.md).
+
 ## apps/local — Python
 
 Requisitos: Python 3.11+, `uv` (recomendado) ou `venv` + `pip`, `ffmpeg` e
