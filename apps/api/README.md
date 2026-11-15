@@ -64,7 +64,7 @@ exporte as variáveis antes.
 - Senhas: **Argon2id** (19 MiB memória, 2 iterações, paralelismo 1, salt individual),
   conforme recomendação da OWASP. Mínimo de 8 caracteres, sem regras de composição.
 - Sessão: opaca (32 bytes, base64url) em cookie `save_finder_session`
-  (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`). O banco guarda apenas o
+  (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`). O banco guarda apenas o
   SHA-256 do token. Múltiplas sessões simultâneas (uma por dispositivo), com
   revogação individual.
 - Expiração: padrão **1 dia** de inatividade / **7 dias** absoluto;
@@ -94,13 +94,44 @@ servidas com Swagger UI em `/swagger/` quando `cmd/api` roda. Resumo:
 | `GET /auth/account` | Dados da conta + CSRF token |
 | `PATCH /auth/account` | Atualiza email e/ou username |
 | `DELETE /auth/account` | Exclui a conta (exige senha atual); dados e sessões caem em cascata |
-| `PUT /auth/account/password` | Troca a senha; revoga as demais sessões |
+| `PUT /auth/account/password` | Troca a senha (re-wrap atômico da DEK, se informado); revoga as demais sessões |
+| `GET /auth/crypto` | Metadados da chave E2EE do usuário (404 se ainda não criada) |
+| `POST /auth/crypto` | Armazena a DEK cifrada + parâmetros KDF (uma vez por conta; 409 se já existe) |
 | `GET /healthz` / `GET /readyz` | Liveness / readiness (ping no banco) |
 
 Erros: `{"error":{"code":"...","message":"..."}}` — códigos estáveis:
 `validation_failed`, `invalid_credentials`, `email_taken`, `username_taken`,
 `unauthorized`, `session_expired`, `csrf_invalid`, `not_found`,
+`key_metadata_not_found`, `key_metadata_exists`,
 `rate_limited`, `internal_error`.
+
+## Criptografia ponta a ponta (E2EE)
+
+O servidor **nunca** vê a DEK em texto claro nem os dados descriptografados:
+ele guarda apenas metadados opacos em `user_key_metadata` (tabela criada pela
+migration `00002`): `salt`, `wrapped_dek` (DEK cifrada pela KEK), `dek_nonce`
+(XChaCha20-Poly1305, 24 bytes) e os limites do Argon2id (`kdf_ops_limit`,
+`kdf_mem_limit` em bytes). Modelo DEK + KEK: o cliente deriva a KEK da
+**senha de login** via Argon2id, gera a DEK aleatória e cifra a DEK com a KEK.
+A senha de login nunca é armazenada; ela só vive em memória durante o
+login/operações. Se o usuário perder a senha, os dados cifrados são
+irrecuperáveis — não há recuperação.
+
+- `POST /auth/crypto` só aceita a primeira gravação (re-setup → 409). Exige a
+  senha atual no corpo (`current_password`) para impedir que uma sessão
+  roubada sequestre o setup.
+- `PUT /auth/account/password` aceita campos opcionais de re-wrap
+  (`new_salt`, `new_wrapped_dek`, `new_dek_nonce`, `new_kdf_ops_limit`,
+  `new_kdf_mem_limit`). Presentes juntos ou ausentes por completo; o servidor
+  aplica a troca de senha e a substituição dos metadados **na mesma
+  transação** (users + user_key_metadata), então conta e metadados nunca
+  dessincronizam. Os dados do usuário não são re-cifrados (a DEK permanece a
+  mesma).
+
+A interface web implementa todo o fluxo de lado do cliente
+([`apps/frontend/web`](../frontend/web)).
+
+Documentação dos fluxos: [`docs/adr/0004-e2ee-dek-kek.md`](../../docs/adr/0004-e2ee-dek-kek.md).
 
 ## Migrations
 

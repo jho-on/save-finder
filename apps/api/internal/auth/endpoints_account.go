@@ -6,6 +6,9 @@ import (
 	"net/http"
 
 	"save-finder/api/internal/httpx"
+	"save-finder/api/internal/keys"
+	"save-finder/api/internal/password"
+	"save-finder/api/internal/principal"
 	"save-finder/api/internal/users"
 	"save-finder/api/internal/validation"
 )
@@ -19,7 +22,7 @@ import (
 // @Failure     401 {object} httpx.ErrorBody
 // @Router      /auth/account [get]
 func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return
@@ -40,7 +43,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 // @Failure     409 {object} httpx.ErrorBody
 // @Router      /auth/account [patch]
 func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return
@@ -111,7 +114,7 @@ func (h *Handler) writeUpdateErr(w http.ResponseWriter, r *http.Request, err err
 // @Failure     401 {object} httpx.ErrorBody
 // @Router      /auth/account [delete]
 func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return
@@ -120,7 +123,7 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	okPassword, err := VerifyPassword(req.Password, p.User.PasswordHash)
+	okPassword, err := password.VerifyPassword(req.Password, p.User.PasswordHash)
 	if err != nil || !okPassword {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeInvalidCredentials, "invalid credentials")
 		return
@@ -141,13 +144,13 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 // @Tags        account
 // @Accept      json
 // @Produce     json
-// @Param       request body ChangePasswordRequest true "Current and new password"
+// @Param       request body ChangePasswordRequest true "Current and new password; optionally a re-wrapped DEK after a password-derived KEK change"
 // @Success     204
 // @Failure     400 {object} httpx.ErrorBody
 // @Failure     401 {object} httpx.ErrorBody
 // @Router      /auth/account/password [put]
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return
@@ -156,7 +159,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, &req) {
 		return
 	}
-	okPassword, err := VerifyPassword(req.CurrentPassword, p.User.PasswordHash)
+	okPassword, err := password.VerifyPassword(req.CurrentPassword, p.User.PasswordHash)
 	if err != nil || !okPassword {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeInvalidCredentials, "invalid credentials")
 		return
@@ -169,14 +172,38 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, httpx.CodeValidationFailed, "password confirmation does not match")
 		return
 	}
-	hash, err := HashPassword(req.NewPassword)
+	hash, err := password.HashPassword(req.NewPassword)
 	if err != nil {
 		h.internalError(w, r, "hash password", err)
 		return
 	}
-	if err := h.Users.UpdatePasswordHash(r.Context(), p.User.ID, hash); err != nil {
-		h.internalError(w, r, "update password", err)
+
+	// Optional atomic re-wrap: the client re-wraps the same DEK with a KEK
+	// derived from the new password and sends the new KDF metadata here.
+	// Password change and metadata replacement happen in one transaction.
+	wrap, err := req.rewrapMetadata()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, httpx.CodeValidationFailed, err.Error())
 		return
+	}
+	if wrap != nil {
+		if h.Keys == nil {
+			h.internalError(w, r, "re-wrap not configured", keys.ErrNotFound)
+			return
+		}
+		if err := h.Keys.UpdatePasswordAndWrappedDEK(r.Context(), p.User.ID, hash, *wrap); err != nil {
+			if err == keys.ErrNotFound {
+				httpx.WriteError(w, http.StatusNotFound, httpx.CodeKeyMetadataNotFound, "key metadata not set up yet")
+				return
+			}
+			h.internalError(w, r, "update password and key metadata", err)
+			return
+		}
+	} else {
+		if err := h.Users.UpdatePasswordHash(r.Context(), p.User.ID, hash); err != nil {
+			h.internalError(w, r, "update password", err)
+			return
+		}
 	}
 	if err := h.Sessions.RevokeAllExcept(r.Context(), p.User.ID, p.Session.ID); err != nil {
 		h.Logger.ErrorContext(r.Context(), "revoke other sessions", slog.String("error", err.Error()))

@@ -21,11 +21,26 @@ definitions:
       current_password:
         example: s3cret-s3cret
         type: string
+      new_dek_nonce:
+        example: e25ld25vbmNl
+        type: string
+      new_kdf_mem_limit:
+        example: 268435456
+        type: integer
+      new_kdf_ops_limit:
+        example: 3
+        type: integer
       new_password:
         example: new-s3cret-s3cret
         type: string
       new_password_confirmation:
         example: new-s3cret-s3cret
+        type: string
+      new_salt:
+        example: e25ldnNhbHQ=
+        type: string
+      new_wrapped_dek:
+        example: e25ld3dyYXA=
         type: string
     type: object
   auth.DeleteAccountRequest:
@@ -122,6 +137,40 @@ definitions:
         example: invalid credentials
         type: string
     type: object
+  keys.KeyMetadataResponse:
+    properties:
+      dek_nonce:
+        type: string
+      kdf_mem_limit:
+        type: integer
+      kdf_ops_limit:
+        type: integer
+      salt:
+        type: string
+      wrapped_dek:
+        type: string
+    type: object
+  keys.KeySetupRequest:
+    properties:
+      current_password:
+        example: s3cret-s3cret
+        type: string
+      dek_nonce:
+        example: e25vbmNl
+        type: string
+      kdf_mem_limit:
+        example: 268435456
+        type: integer
+      kdf_ops_limit:
+        example: 3
+        type: integer
+      salt:
+        example: e3NhbHQ=
+        type: string
+      wrapped_dek:
+        example: e3dyYXBwZWQ=
+        type: string
+    type: object
 info:
   contact: {}
   description: 'API remota do SaveFinder: autenticação, persistência e sincronização.'
@@ -207,7 +256,8 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Current and new password
+      - description: Current and new password; optionally a re-wrapped DEK after a
+          password-derived KEK change
         in: body
         name: request
         required: true
@@ -229,6 +279,58 @@ paths:
       summary: Change the password
       tags:
       - account
+  /auth/crypto:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/keys.KeyMetadataResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Get the user's key metadata
+      tags:
+      - crypto
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wrapped DEK, KDF parameters and current password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/keys.KeySetupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/keys.KeyMetadataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Store the user's key metadata (first time only)
+      tags:
+      - crypto
   /auth/login:
     post:
       consumes:

@@ -143,7 +143,7 @@ const docTemplate = `{
                 "summary": "Change the password",
                 "parameters": [
                     {
-                        "description": "Current and new password",
+                        "description": "Current and new password; optionally a re-wrapped DEK after a password-derived KEK change",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -164,6 +164,86 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/crypto": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crypto"
+                ],
+                "summary": "Get the user's key metadata",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/keys.KeyMetadataResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crypto"
+                ],
+                "summary": "Store the user's key metadata (first time only)",
+                "parameters": [
+                    {
+                        "description": "Wrapped DEK, KDF parameters and current password",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/keys.KeySetupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/keys.KeyMetadataResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorBody"
                         }
@@ -412,6 +492,18 @@ const docTemplate = `{
                     "type": "string",
                     "example": "s3cret-s3cret"
                 },
+                "new_dek_nonce": {
+                    "type": "string",
+                    "example": "e25ld25vbmNl"
+                },
+                "new_kdf_mem_limit": {
+                    "type": "integer",
+                    "example": 268435456
+                },
+                "new_kdf_ops_limit": {
+                    "type": "integer",
+                    "example": 3
+                },
                 "new_password": {
                     "type": "string",
                     "example": "new-s3cret-s3cret"
@@ -419,6 +511,14 @@ const docTemplate = `{
                 "new_password_confirmation": {
                     "type": "string",
                     "example": "new-s3cret-s3cret"
+                },
+                "new_salt": {
+                    "type": "string",
+                    "example": "e25ldnNhbHQ="
+                },
+                "new_wrapped_dek": {
+                    "type": "string",
+                    "example": "e25ld3dyYXA="
                 }
             }
         },
@@ -557,6 +657,55 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "invalid credentials"
+                }
+            }
+        },
+        "keys.KeyMetadataResponse": {
+            "type": "object",
+            "properties": {
+                "dek_nonce": {
+                    "type": "string"
+                },
+                "kdf_mem_limit": {
+                    "type": "integer"
+                },
+                "kdf_ops_limit": {
+                    "type": "integer"
+                },
+                "salt": {
+                    "type": "string"
+                },
+                "wrapped_dek": {
+                    "type": "string"
+                }
+            }
+        },
+        "keys.KeySetupRequest": {
+            "type": "object",
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "example": "s3cret-s3cret"
+                },
+                "dek_nonce": {
+                    "type": "string",
+                    "example": "e25vbmNl"
+                },
+                "kdf_mem_limit": {
+                    "type": "integer",
+                    "example": 268435456
+                },
+                "kdf_ops_limit": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "salt": {
+                    "type": "string",
+                    "example": "e3NhbHQ="
+                },
+                "wrapped_dek": {
+                    "type": "string",
+                    "example": "e3dyYXBwZWQ="
                 }
             }
         }

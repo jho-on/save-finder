@@ -3,6 +3,7 @@ package auth_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 	"save-finder/api/internal/auth"
 	"save-finder/api/internal/db"
 	"save-finder/api/internal/httpserver"
+	"save-finder/api/internal/keys"
 	"save-finder/api/internal/ratelimit"
 	"save-finder/api/internal/sessions"
 	"save-finder/api/internal/users"
@@ -51,11 +53,14 @@ func TestMain(m *testing.M) {
 		ratelimit.NewIdentityLimiter(1000),
 		ratelimit.NewIdentityLimiter(1000),
 		slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
+		keys.NewStore(pool),
 	)
 	testServer = httptest.NewServer(httpserver.New(httpserver.Deps{
 		Handler: handler,
-		Logger:  slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
-		Ready:   pool.Ping,
+		Crypto: keys.NewHandler(keys.NewStore(pool), users.NewStore(pool),
+			slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))),
+		Logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
+		Ready:  pool.Ping,
 	}))
 	code := m.Run()
 	testServer.Close()
@@ -312,6 +317,119 @@ func TestChangePasswordRevokesOtherSessions(t *testing.T) {
 	readBody(t, resp)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("current session should stay valid, got %d", resp.StatusCode)
+	}
+}
+
+func TestChangePasswordAtomicRewrap(t *testing.T) {
+	c := newClient(t)
+	email := unique("rewrap") + "@example.com"
+	username := unique("rewrap")
+	password := "senha-super-secreta-1"
+	newPassword := "nova-senha-super-secreta-2"
+
+	code, reg := register(t, c, email, username, password)
+	if code != http.StatusCreated {
+		t.Fatalf("register: got %d", code)
+	}
+
+	// Set up crypto metadata (valid, arbitrary blobs).
+	originalSalt := bytes.Repeat([]byte{0xAB}, 16)
+	setup := map[string]any{
+		"salt":             base64.StdEncoding.EncodeToString(originalSalt),
+		"wrapped_dek":      base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0xCD}, 48)),
+		"dek_nonce":        base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0xEF}, 24)),
+		"kdf_ops_limit":    3,
+		"kdf_mem_limit":    67108864,
+		"current_password": password,
+	}
+	resp := doJSON(t, c, http.MethodPost, "/auth/crypto", setup, csrfHeaders(reg.CSRFToken))
+	setupBody := readBody(t, resp)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("setup crypto: got %d body=%s", resp.StatusCode, setupBody)
+	}
+
+	// Partial re-wrap block must be rejected.
+	resp = doJSON(t, c, http.MethodPut, "/auth/account/password", map[string]any{
+		"current_password": password, "new_password": newPassword,
+		"new_password_confirmation": newPassword, "new_salt": base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+	}, csrfHeaders(reg.CSRFToken))
+	readBody(t, resp)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("partial rewrap: got %d", resp.StatusCode)
+	}
+
+	// Wrong current password must not update anything.
+	newSaltWrong := bytes.Repeat([]byte{0x11}, 16)
+	resp = doJSON(t, c, http.MethodPut, "/auth/account/password", map[string]any{
+		"current_password": "senha-errada-123", "new_password": newPassword,
+		"new_password_confirmation": newPassword,
+		"new_salt":                  base64.StdEncoding.EncodeToString(newSaltWrong),
+		"new_wrapped_dek":           base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x22}, 48)),
+		"new_dek_nonce":             base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x33}, 24)),
+		"new_kdf_ops_limit":         3, "new_kdf_mem_limit": 67108864,
+	}, csrfHeaders(reg.CSRFToken))
+	readBody(t, resp)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("rewrap with wrong password: got %d", resp.StatusCode)
+	}
+	// Metadata unchanged.
+	resp = doJSON(t, c, http.MethodGet, "/auth/crypto", nil, nil)
+	body := readBody(t, resp)
+	var meta map[string]any
+	if err := json.Unmarshal(body, &meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta["salt"] != base64.StdEncoding.EncodeToString(originalSalt) {
+		t.Fatalf("metadata should be unchanged after failed re-wrap, got salt=%v", meta["salt"])
+	}
+
+	// Correct re-wrap: atomic password + metadata update.
+	newSalt := bytes.Repeat([]byte{0x42}, 16)
+	newWrapped := bytes.Repeat([]byte{0x51}, 48)
+	newNonce := bytes.Repeat([]byte{0x61}, 24)
+	resp = doJSON(t, c, http.MethodPut, "/auth/account/password", map[string]any{
+		"current_password": password, "new_password": newPassword,
+		"new_password_confirmation": newPassword,
+		"new_salt":                  base64.StdEncoding.EncodeToString(newSalt),
+		"new_wrapped_dek":           base64.StdEncoding.EncodeToString(newWrapped),
+		"new_dek_nonce":             base64.StdEncoding.EncodeToString(newNonce),
+		"new_kdf_ops_limit":         4, "new_kdf_mem_limit": 33554432,
+	}, csrfHeaders(reg.CSRFToken))
+	readBody(t, resp)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("change password with rewrap: got %d", resp.StatusCode)
+	}
+
+	// Metadata now reflects the new wrap.
+	resp = doJSON(t, c, http.MethodGet, "/auth/crypto", nil, nil)
+	body = readBody(t, resp)
+	if err := json.Unmarshal(body, &meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta["salt"] != base64.StdEncoding.EncodeToString(newSalt) ||
+		meta["wrapped_dek"] != base64.StdEncoding.EncodeToString(newWrapped) ||
+		meta["dek_nonce"] != base64.StdEncoding.EncodeToString(newNonce) {
+		t.Fatalf("metadata not updated: %s", body)
+	}
+	if meta["kdf_ops_limit"] != float64(4) || meta["kdf_mem_limit"] != float64(33554432) {
+		t.Fatalf("kdf params not updated: %s", body)
+	}
+
+	// Old password no longer logs in; new one does.
+	c2 := newClient(t)
+	resp = doJSON(t, c2, http.MethodPost, "/auth/login", map[string]any{
+		"identifier": email, "password": password,
+	}, nil)
+	readBody(t, resp)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("old password should fail, got %d", resp.StatusCode)
+	}
+	resp = doJSON(t, c2, http.MethodPost, "/auth/login", map[string]any{
+		"identifier": email, "password": newPassword,
+	}, nil)
+	readBody(t, resp)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("new password should work, got %d", resp.StatusCode)
 	}
 }
 

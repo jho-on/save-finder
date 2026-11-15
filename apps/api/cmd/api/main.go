@@ -23,6 +23,7 @@ import (
 	"save-finder/api/internal/config"
 	"save-finder/api/internal/db"
 	"save-finder/api/internal/httpserver"
+	"save-finder/api/internal/keys"
 	"save-finder/api/internal/ratelimit"
 	"save-finder/api/internal/sessions"
 	"save-finder/api/internal/users"
@@ -73,7 +74,9 @@ func run() error {
 		ratelimit.NewIdentityLimiter(120), // 120 req/min per identity
 		ratelimit.NewIdentityLimiter(10),  // 10 req/min for sensitive ops
 		logger,
+		keys.NewStore(pool),
 	)
+	cryptoDeps := keys.NewHandler(keys.NewStore(pool), users.NewStore(pool), logger)
 
 	// Periodically purge expired sessions.
 	go func() {
@@ -101,6 +104,7 @@ func run() error {
 		Handler: httpserver.New(httpserver.Deps{
 			Logger:       logger,
 			Handler:      handlerDeps,
+			Crypto:       cryptoDeps,
 			TrustProxy:   cfg.TrustProxy,
 			SwaggerRoute: true,
 			Ready: func(ctx context.Context) error {

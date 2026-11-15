@@ -14,6 +14,7 @@ import (
 	httpswagger "github.com/swaggo/http-swagger/v2"
 
 	"save-finder/api/internal/auth"
+	"save-finder/api/internal/keys"
 
 	_ "save-finder/api/docs"
 )
@@ -22,6 +23,7 @@ import (
 type Deps struct {
 	Logger       *slog.Logger
 	Handler      *auth.Handler
+	Crypto       *keys.Handler
 	Ready        func(ctx context.Context) error
 	TrustProxy   bool
 	SwaggerRoute bool
@@ -54,6 +56,8 @@ func New(d Deps) http.Handler {
 	})
 
 	h := d.Handler
+	cryptoHandler := d.Crypto
+
 	r.Route("/auth", func(r chi.Router) {
 		r.With(h.UnauthLimit).Post("/register", h.Register)
 		r.With(h.UnauthLimit).Post("/login", h.Login)
@@ -71,6 +75,11 @@ func New(d Deps) http.Handler {
 			r.Patch("/account", h.UpdateAccount)
 			r.With(h.SensitiveLimit).Delete("/account", h.DeleteAccount)
 			r.With(h.SensitiveLimit).Put("/account/password", h.ChangePassword)
+
+			if cryptoHandler != nil {
+				r.Get("/crypto", cryptoHandler.Get)
+				r.Post("/crypto", cryptoHandler.Setup)
+			}
 		})
 	})
 

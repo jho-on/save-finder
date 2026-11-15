@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"save-finder/api/internal/httpx"
+	"save-finder/api/internal/password"
+	"save-finder/api/internal/principal"
 	"save-finder/api/internal/ratelimit"
 	"save-finder/api/internal/users"
 	"save-finder/api/internal/validation"
@@ -57,7 +59,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	h.IPRisk.Penalize(ip, ratelimit.PointsRegister)
 
-	hash, err := HashPassword(req.Password)
+	hash, err := password.HashPassword(req.Password)
 	if err != nil {
 		h.internalError(w, r, "hash password", err)
 		return
@@ -109,7 +111,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, users.ErrNotFound) {
 			// Equalize timing with the wrong-password path.
-			_, _ = VerifyPassword(req.Password, h.dummyHash)
+			_, _ = password.VerifyPassword(req.Password, h.dummyHash)
 			h.IPRisk.Penalize(ip, ratelimit.PointsLoginFailure)
 			h.Logger.InfoContext(r.Context(), "login failed: unknown identifier", slog.String("ip", ip))
 			httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeInvalidCredentials, "invalid credentials")
@@ -119,7 +121,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := VerifyPassword(req.Password, u.PasswordHash)
+	ok, err := password.VerifyPassword(req.Password, u.PasswordHash)
 	if err != nil || !ok {
 		h.IPRisk.Penalize(ip, ratelimit.PointsLoginFailure)
 		h.Logger.InfoContext(r.Context(), "login failed: wrong password", slog.String("user_id", u.ID.String()))
@@ -165,7 +167,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Failure     401 {object} httpx.ErrorBody
 // @Router      /auth/logout-all [post]
 func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return
@@ -188,7 +190,7 @@ func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 // @Failure     401 {object} httpx.ErrorBody
 // @Router      /auth/sessions [get]
 func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return
@@ -225,7 +227,7 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 // @Failure     404 {object} httpx.ErrorBody
 // @Router      /auth/sessions/{id} [delete]
 func (h *Handler) RevokeSession(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := principal.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 		return

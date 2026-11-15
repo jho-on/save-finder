@@ -3,10 +3,14 @@
 package auth
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"save-finder/api/internal/cryptometa"
+	"save-finder/api/internal/keys"
+	"save-finder/api/internal/password"
 	"save-finder/api/internal/ratelimit"
 	"save-finder/api/internal/sessions"
 	"save-finder/api/internal/users"
@@ -24,6 +28,10 @@ type Handler struct {
 	SensitiveLim *ratelimit.IdentityLimiter
 	Logger       *slog.Logger
 
+	// Keys is wired for the atomic password-change-with-rewrap flow.
+	// May be nil (then re-wrap requests fail closed).
+	Keys *keys.Store
+
 	dummyHash string
 }
 
@@ -31,11 +39,11 @@ type Handler struct {
 // equalize timing between unknown users and wrong passwords.
 func NewHandler(u *users.Store, s *sessions.Store, cookieSecure bool,
 	ipRisk *ratelimit.RiskLimiter, identityLim, sensitiveLim *ratelimit.IdentityLimiter,
-	logger *slog.Logger) *Handler {
+	logger *slog.Logger, keysStore *keys.Store) *Handler {
 	h := &Handler{Users: u, Sessions: s, CookieSecure: cookieSecure,
-		IPRisk: ipRisk, IdentityLim: identityLim, SensitiveLim: sensitiveLim, Logger: logger}
+		IPRisk: ipRisk, IdentityLim: identityLim, SensitiveLim: sensitiveLim, Logger: logger, Keys: keysStore}
 	// Precompute to avoid leaking timing differences on unknown identifiers.
-	h.dummyHash, _ = DummyHash()
+	h.dummyHash, _ = password.DummyHash()
 	return h
 }
 
@@ -64,10 +72,42 @@ type UpdateAccountRequest struct {
 }
 
 // ChangePasswordRequest is the body of PUT /auth/account/password.
+// After a password change, the client re-derives a KEK from the new
+// password, wraps the same DEK with it and sends the new KDF metadata here;
+// the server applies both updates atomically. All five new_* fields must be
+// present together or all absent.
 type ChangePasswordRequest struct {
-	CurrentPassword         string `json:"current_password" example:"s3cret-s3cret"`
-	NewPassword             string `json:"new_password" example:"new-s3cret-s3cret"`
-	NewPasswordConfirmation string `json:"new_password_confirmation" example:"new-s3cret-s3cret"`
+	CurrentPassword         string  `json:"current_password" example:"s3cret-s3cret"`
+	NewPassword             string  `json:"new_password" example:"new-s3cret-s3cret"`
+	NewPasswordConfirmation string  `json:"new_password_confirmation" example:"new-s3cret-s3cret"`
+	NewSalt                 *string `json:"new_salt,omitempty" example:"e25ldnNhbHQ="`
+	NewWrappedDEK           *string `json:"new_wrapped_dek,omitempty" example:"e25ld3dyYXA="`
+	NewDEKNonce             *string `json:"new_dek_nonce,omitempty" example:"e25ld25vbmNl"`
+	NewKDFOpsLimit          *int64  `json:"new_kdf_ops_limit,omitempty" example:"3"`
+	NewKDFMemLimit          *int64  `json:"new_kdf_mem_limit,omitempty" example:"268435456"`
+}
+
+// rewrapMetadata decodes and validates the optional re-wrap block.
+// Returns nil metadata when no re-wrap fields are present.
+func (req *ChangePasswordRequest) rewrapMetadata() (*keys.Metadata, error) {
+	switch {
+	case req.NewSalt != nil && req.NewWrappedDEK != nil && req.NewDEKNonce != nil && req.NewKDFOpsLimit != nil && req.NewKDFMemLimit != nil:
+	case req.NewSalt == nil && req.NewWrappedDEK == nil && req.NewDEKNonce == nil && req.NewKDFOpsLimit == nil && req.NewKDFMemLimit == nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("all or none of the new_* re-wrap fields must be provided")
+	}
+	params, err := cryptometa.Validate(*req.NewSalt, *req.NewWrappedDEK, *req.NewDEKNonce, *req.NewKDFOpsLimit, *req.NewKDFMemLimit)
+	if err != nil {
+		return nil, err
+	}
+	return &keys.Metadata{
+		Salt:        params.Salt,
+		WrappedDEK:  params.WrappedDEK,
+		DEKNonce:    params.DEKNonce,
+		KDFOpsLimit: params.KDFOpsLimit,
+		KDFMemLimit: params.KDFMemLimit,
+	}, nil
 }
 
 // DeleteAccountRequest is the body of DELETE /auth/account.
@@ -127,7 +167,7 @@ func setSessionCookie(w http.ResponseWriter, token string, secure bool, absolute
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  absoluteExpires,
 	})
 }
@@ -139,7 +179,7 @@ func clearSessionCookie(w http.ResponseWriter, secure bool) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
 }

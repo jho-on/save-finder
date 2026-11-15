@@ -1,34 +1,14 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 	"time"
 
 	"save-finder/api/internal/httpx"
+	"save-finder/api/internal/principal"
 	"save-finder/api/internal/ratelimit"
 	"save-finder/api/internal/sessions"
-	"save-finder/api/internal/users"
 )
-
-type contextKey struct{}
-
-// Principal is the authenticated user together with its session.
-type Principal struct {
-	User    users.User
-	Session sessions.Session
-}
-
-// WithPrincipal stores the principal in the request context.
-func WithPrincipal(ctx context.Context, p Principal) context.Context {
-	return context.WithValue(ctx, contextKey{}, p)
-}
-
-// PrincipalFrom extracts the principal, if any.
-func PrincipalFrom(ctx context.Context) (Principal, bool) {
-	p, ok := ctx.Value(contextKey{}).(Principal)
-	return p, ok
-}
 
 // clientIP returns the IP to use for risk accounting. When the service is
 // behind a trusted proxy, enable TRUST_PROXY so chi's RealIP middleware
@@ -80,7 +60,7 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 				"too many requests, slow down")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), Principal{User: user, Session: sess})))
+		next.ServeHTTP(w, r.WithContext(principal.With(r.Context(), principal.Principal{User: user, Session: sess})))
 	})
 }
 
@@ -93,7 +73,7 @@ func (h *Handler) CSRF(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		p, ok := PrincipalFrom(r.Context())
+		p, ok := principal.From(r.Context())
 		if !ok {
 			httpx.WriteError(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "authentication required")
 			return
@@ -110,7 +90,7 @@ func (h *Handler) CSRF(next http.Handler) http.Handler {
 // operations (password change, account deletion).
 func (h *Handler) SensitiveLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, ok := PrincipalFrom(r.Context())
+		p, ok := principal.From(r.Context())
 		if ok && !h.SensitiveLim.Allow(p.User.ID.String()) {
 			httpx.WriteError(w, http.StatusTooManyRequests, httpx.CodeRateLimited,
 				"too many attempts, try again later")

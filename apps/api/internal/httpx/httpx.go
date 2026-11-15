@@ -9,16 +9,18 @@ import (
 
 // Error codes returned in the response body. They are stable API surface.
 const (
-	CodeValidationFailed   = "validation_failed"
-	CodeInvalidCredentials = "invalid_credentials"
-	CodeEmailTaken         = "email_taken"
-	CodeUsernameTaken      = "username_taken"
-	CodeUnauthorized       = "unauthorized"
-	CodeSessionExpired     = "session_expired"
-	CodeCSRFInvalid        = "csrf_invalid"
-	CodeNotFound           = "not_found"
-	CodeRateLimited        = "rate_limited"
-	CodeInternal           = "internal_error"
+	CodeValidationFailed    = "validation_failed"
+	CodeInvalidCredentials  = "invalid_credentials"
+	CodeEmailTaken          = "email_taken"
+	CodeUsernameTaken       = "username_taken"
+	CodeUnauthorized        = "unauthorized"
+	CodeSessionExpired      = "session_expired"
+	CodeCSRFInvalid         = "csrf_invalid"
+	CodeNotFound            = "not_found"
+	CodeRateLimited         = "rate_limited"
+	CodeInternal            = "internal_error"
+	CodeKeyMetadataNotFound = "key_metadata_not_found"
+	CodeKeyMetadataExists   = "key_metadata_exists"
 )
 
 // ErrorDetail is the machine-readable part of an error response.
