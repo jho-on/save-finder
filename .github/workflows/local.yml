@@ -39,6 +39,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: apps/local/uv.lock
 
+      - name: install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: install Python 3.11
         run: uv python install 3.11
 
