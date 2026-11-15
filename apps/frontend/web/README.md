@@ -5,7 +5,7 @@ Interface web remota do SaveFinder. Aplicação Go com templates
 criptografia ponta a ponta feita exclusivamente no navegador.
 
 O web **não** fala diretamente com o banco: ele serve as páginas, os estáticos
-e faz reverse proxy de `/auth/*` para a API remota (`apps/api`). Assim a
+e faz reverse proxy de `/auth/*` e `/library/*` para a API remota (`apps/api`). Assim a
 sessão (cookie) e o CSRF token fluem same-origin, sem CORS.
 
 ## Requisitos
@@ -33,7 +33,7 @@ Variáveis de ambiente:
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `PORT` | `3000` | Porta HTTP do web |
-| `API_UPSTREAM` | `http://localhost:8080` | Endereço da API remota (proxy de `/auth/*`) |
+| `API_UPSTREAM` | `http://localhost:8080` | Endereço da API remota (proxy de `/auth/*` e `/library/*`) |
 | `LOG_FORMAT` | `json` | `json` ou `text` |
 
 ## Identidade visual (Protea)
@@ -72,13 +72,51 @@ via libsodium.js; ambos vendored em `static/vendor/` — sem CDN em runtime.
 
 | Rota | Descrição |
 |---|---|
-| `GET /login` | Tela de login (e-mail/usuário + senha, "lembrar de mim") |
+| `GET /` | Casca única autenticada (biblioteca, tags, detalhe) — sem dados no HTML; ver "A casca e as views" |
+| `GET /login` | Redirect para `/` (a tela de login vive na casca) |
 | `GET /register` | Tela de cadastro (e-mail, usuário, senha + criação da DEK) |
 | `GET /change-password` | Troca de senha com re-wrap atômico da DEK |
-| `GET /` | Home autenticada (valida a sessão contra a API) |
 | `GET /static/*` | Estáticos embarcados (CSS, JS, vendor) |
 | `ANY /auth/*` | Reverse proxy para a API remota |
+| `ANY /library[/*]` | Reverse proxy para os endpoints cifrados da biblioteca |
 
 As páginas fazem fetch próprio para `/auth/*` (mesma origem) usando o CSRF
 token retornado pelo login/registro; a sessão vai em cookie
 `save_finder_session` (`HttpOnly`, `SameSite=Lax`; `Secure` em produção).
+
+## A casca e as views (`/`)
+
+Após o login, **todo o app vive numa única página**, sem
+navegação de documento. As telas trocam por JavaScript via hash:
+
+| Hash | Tela |
+|---|---|
+| `#/biblioteca` | Grade de posts: busca **100% client-side** (legenda, autor, tags, coleção), filtros por tipo e status |
+| `#/tags` | Tags amplas com contagem de itens e pré-visualização |
+| `#/tag/{slug}` | Posts da tag ampla + chips de tags específicas com contagens |
+| `#/item/{platform}/{external_id}` | Detalhe: thumb, legenda, metadados, tags, link para a origem e transcrição (se houver) |
+
+Como o servidor não decifra nada, o HTML da casca não contém nenhum dado da
+conta; quem decide entre tela de login, desbloqueio e biblioteca é o client:
+
+- Sem sessão → **login** (mesma UX de antes).
+- Com sessão mas sem DEK (ex.: após refresh/aba nova) → **desbloqueio**: a
+  senha é pedida uma vez para desembrulhar a DEK localmente.
+- DEK em memória → biblioteca.
+
+Thumbnails são buscadas sob demanda (`IntersectionObserver`) e decifradas no
+navegador antes de virar `blob:` URL (CSP `img-src` inclui `blob:`).
+
+## Cache local (ciphertext only)
+
+Para revisitas rápidas a biblioteca grava **somente o ciphertext** em
+IndexedDB (stores `items` e `thumbs`):
+
+1. Na abertura, o client busca `GET /library/manifest` (lista leve de
+   `item_key` + `updated_at`).
+2. Itens que mudaram (ou novos) são re-buscados; os que sumiram são
+   descartados; o restante é decifrado direto do cache.
+3. Plaintext nunca é gravado em disco; a DEK nunca sai da memória da página.
+
+Se IndexedDB falhar (quota/indisponível), o app degrada para rede pura, sem
+erro. As respostas da API vão com `Cache-Control: no-store`.

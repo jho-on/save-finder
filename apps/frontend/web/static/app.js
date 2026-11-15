@@ -276,7 +276,12 @@ async function handleLogin(form, button) {
 		return showFeedback('error', 'Não foi possível desbloquear a chave de criptografia.');
 	}
 	dek = unwrapped;
-	window.location.assign('/');
+	// Na casca principal (/), casa a transição para o app sem recarregar a página.
+	if (typeof window.SaveFinderUnlockAndShow === 'function') {
+		window.SaveFinderUnlockAndShow(dek, csrfToken);
+	} else {
+		window.location.assign('/');
+	}
 }
 
 async function handleChangePassword(form, button) {

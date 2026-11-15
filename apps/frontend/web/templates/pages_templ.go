@@ -9,7 +9,7 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Login() templ.Component {
+func Register() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -38,7 +38,7 @@ func Login() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<p class=\"eyebrow\">Acesso</p><h1>Entrar</h1><p class=\"lede\">Use o e-mail ou usuário e sua senha. A mesma senha desbloqueia seus dados cifrados.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<p class=\"eyebrow\">Cadastro</p><h1>Criar conta</h1><p class=\"lede\">E-mail, usuário e senha. Ao criar a conta, geramos a chave que cifra seus dados neste navegador.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -46,13 +46,13 @@ func Login() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<form data-form=\"login\" novalidate><div class=\"field\"><label for=\"identifier\">E-mail ou usuário</label> <input id=\"identifier\" name=\"identifier\" type=\"text\" autocomplete=\"username\" autocapitalize=\"none\" spellcheck=\"false\" required></div><div class=\"field\"><label for=\"password\">Senha</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" minlength=\"8\" required></div><div class=\"row\"><label class=\"checkbox\"><input type=\"checkbox\" name=\"remember_me\"> Lembrar de mim</label></div><button class=\"button\" type=\"submit\" data-submit>Entrar</button></form><p class=\"switch\">Ainda não tem conta? <a href=\"/register\">Criar conta</a></p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<form data-form=\"register\" novalidate><div class=\"field\"><label for=\"email\">E-mail</label> <input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\" autocapitalize=\"none\" spellcheck=\"false\" required></div><div class=\"field\"><label for=\"username\">Usuário</label> <input id=\"username\" name=\"username\" type=\"text\" autocomplete=\"username\" autocapitalize=\"none\" spellcheck=\"false\" minlength=\"3\" maxlength=\"30\" pattern=\"[a-z0-9._\\-]+\" required> <span class=\"hint\">3–30 caracteres: a–z, 0–9, \"_\", \".\" ou \"-\"</span></div><div class=\"field\"><label for=\"password\">Senha</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required> <span class=\"hint\">Mínimo de 8 caracteres, sem regras de composição.</span></div><div class=\"field\"><label for=\"password_confirmation\">Confirmar senha</label> <input id=\"password_confirmation\" name=\"password_confirmation\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></div><button class=\"button\" type=\"submit\" data-submit>Criar conta</button></form><p class=\"switch\">Já tem conta? <a href=\"/login\">Entrar</a></p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout("Entrar", "login", true).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = LayoutGate("Criar conta", "register", true).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -60,7 +60,7 @@ func Login() templ.Component {
 	})
 }
 
-func Register() templ.Component {
+func ChangePassword() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -89,7 +89,7 @@ func Register() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<p class=\"eyebrow\">Cadastro</p><h1>Criar conta</h1><p class=\"lede\">E-mail, usuário e senha. Ao criar a conta, geramos a chave que cifra seus dados neste navegador.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<p class=\"eyebrow\">Conta</p><h1>Trocar senha</h1><p class=\"lede\">A mesma senha protege sua conta e seus dados. Trocando-a, re-ciframos a chave DEK automaticamente — seus dados continuam legíveis.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -97,141 +97,13 @@ func Register() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form data-form=\"register\" novalidate><div class=\"field\"><label for=\"email\">E-mail</label> <input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\" autocapitalize=\"none\" spellcheck=\"false\" required></div><div class=\"field\"><label for=\"username\">Usuário</label> <input id=\"username\" name=\"username\" type=\"text\" autocomplete=\"username\" autocapitalize=\"none\" spellcheck=\"false\" minlength=\"3\" maxlength=\"30\" pattern=\"[a-z0-9._\\-]+\" required> <span class=\"hint\">3–30 caracteres: a–z, 0–9, \"_\", \".\" ou \"-\"</span></div><div class=\"field\"><label for=\"password\">Senha</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required> <span class=\"hint\">Mínimo de 8 caracteres, sem regras de composição.</span></div><div class=\"field\"><label for=\"password_confirmation\">Confirmar senha</label> <input id=\"password_confirmation\" name=\"password_confirmation\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></div><button class=\"button\" type=\"submit\" data-submit>Criar conta</button></form><p class=\"switch\">Já tem conta? <a href=\"/login\">Entrar</a></p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form data-form=\"change-password\" novalidate><div class=\"field\"><label for=\"current_password\">Senha atual</label> <input id=\"current_password\" name=\"current_password\" type=\"password\" autocomplete=\"current-password\" required></div><div class=\"field\"><label for=\"new_password\">Nova senha</label> <input id=\"new_password\" name=\"new_password\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></div><div class=\"field\"><label for=\"new_password_confirmation\">Confirmar nova senha</label> <input id=\"new_password_confirmation\" name=\"new_password_confirmation\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></div><button class=\"button\" type=\"submit\" data-submit>Salvar nova senha</button></form><p class=\"switch\"><a href=\"/\">Voltar</a></p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout("Criar conta", "register", true).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func ChangePassword() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-			if !templ_7745c5c3_IsBuffer {
-				defer func() {
-					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err == nil {
-						templ_7745c5c3_Err = templ_7745c5c3_BufErr
-					}
-				}()
-			}
-			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p class=\"eyebrow\">Conta</p><h1>Trocar senha</h1><p class=\"lede\">A mesma senha protege sua conta e seus dados. Trocando-a, re-ciframos a chave DEK automaticamente — seus dados continuam legíveis.</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = Feedback().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form data-form=\"change-password\" novalidate><div class=\"field\"><label for=\"current_password\">Senha atual</label> <input id=\"current_password\" name=\"current_password\" type=\"password\" autocomplete=\"current-password\" required></div><div class=\"field\"><label for=\"new_password\">Nova senha</label> <input id=\"new_password\" name=\"new_password\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></div><div class=\"field\"><label for=\"new_password_confirmation\">Confirmar nova senha</label> <input id=\"new_password_confirmation\" name=\"new_password_confirmation\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></div><button class=\"button\" type=\"submit\" data-submit>Salvar nova senha</button></form><p class=\"switch\"><a href=\"/\">Voltar</a></p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			return nil
-		})
-		templ_7745c5c3_Err = Layout("Trocar senha", "change-password", true).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func Home(email, username string) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-			if !templ_7745c5c3_IsBuffer {
-				defer func() {
-					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err == nil {
-						templ_7745c5c3_Err = templ_7745c5c3_BufErr
-					}
-				}()
-			}
-			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"eyebrow\">Conta</p><h1>Olá, ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(username)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 87, Col: 22}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</h1><p class=\"lede\">Sessão iniciada como <strong>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(email)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 88, Col: 55}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</strong>. Em breve, seus arquivos cifrados aparecem aqui.</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = Feedback().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<form data-form=\"logout\" class=\"logout-form\"><button class=\"button button-secondary\" type=\"submit\" data-submit>Sair</button></form><p class=\"switch\"><a href=\"/change-password\">Trocar senha</a></p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			return nil
-		})
-		templ_7745c5c3_Err = Layout("Início", "home", false).Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout("Trocar senha", "change-password", true).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

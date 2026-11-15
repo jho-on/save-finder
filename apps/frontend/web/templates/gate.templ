@@ -1,0 +1,33 @@
+package templates
+
+// LayoutGate is the minimal chrome for public pages (register): no app
+// navigation, no account controls — just the card on the canvas and a
+// floating theme toggle.
+templ LayoutGate(title, page string, withSodium bool) {
+	<!DOCTYPE html>
+	<html lang="pt-BR" data-theme="light">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · SaveFinder</title>
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
+			<link rel="stylesheet" href="/static/style.css"/>
+			if withSodium {
+				<script src="/static/vendor/libsodium.js" defer></script>
+				<script src="/static/vendor/libsodium-wrappers.js" defer></script>
+				<script src="/static/vendor/hash-wasm-argon2.js" defer></script>
+			}
+			<script src="/static/app.js" defer></script>
+		</head>
+		<body data-page={ page } class="gate-body">
+			<button type="button" class="theme-toggle theme-toggle-float" data-theme-toggle>Trocar tema</button>
+			<main class="gate-wrap">
+				<div class="gate-card">
+					<span class="brand-name gate-brand">SaveFinder</span>
+					{ children... }
+				</div>
+				<p class="foot">SaveFinder · seus dados ficam com você, cifrados ponta a ponta.</p>
+			</main>
+		</body>
+	</html>
+}
