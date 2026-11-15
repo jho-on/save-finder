@@ -58,12 +58,15 @@ A taxonomia fechada fica em [`config/taxonomy.yaml`](config/taxonomy.yaml), gera
 
 ## Uso
 
+Os exemplos usam `uv run` (o caminho recomendado). Com `venv` + `pip`, troque
+`uv run save-finder` por `.venv/bin/save-finder` (prefixe `.venv/bin/`).
+
 ```bash
 # uma vez: cria data/, aplica migrations e carrega a taxonomia
-.venv/bin/save-finder db init
+uv run save-finder db init
 
 # sobe a API local
-.venv/bin/save-finder serve
+uv run save-finder serve
 ```
 
 Abra `http://127.0.0.1:8000/pipeline` e arraste o ZIP da exportação. É o caminho recomendado
@@ -76,45 +79,57 @@ vários arquivos:
 
 ```bash
 # o 1º argumento é a plataforma; o 2º é o ZIP, a pasta `saved` ou um JSON
-.venv/bin/save-finder import instagram ~/Downloads/instagram-*.zip
+uv run save-finder import instagram ~/Downloads/instagram-*.zip
 ```
 
 O relatório mostra novos, existentes e ignorados. Reimportar não duplica itens.
 
 ```bash
 # busca metadados públicos e baixa a thumbnail dos itens pendentes
-.venv/bin/save-finder enrich --limit 30
+uv run save-finder enrich --limit 30
 
 # tenta de novo somente os itens que ficaram com status `error`
-.venv/bin/save-finder enrich --retry-errors --limit 10
+uv run save-finder enrich --retry-errors --limit 10
 
 # download das peças, áudio, keyframe, thumbnail e análise (transcrição/embedding)
-.venv/bin/save-finder download --limit 3
+uv run save-finder download --limit 3
 
 # apenas baixar, sem carregar modelos de IA
-.venv/bin/save-finder download --limit 3 --no-analyze
+uv run save-finder download --limit 3 --no-analyze
 
 # classificação automática pelas tags da taxonomia
-.venv/bin/save-finder classify --limit 30
+uv run save-finder classify --limit 30
 
 # reclassificar do banco, sem baixar mídia nem acessar a rede
-.venv/bin/save-finder classify --reclassify --limit 30
+uv run save-finder classify --reclassify --limit 30
 
 # incluir na reclassificação as tags removidas manualmente
-.venv/bin/save-finder classify --restore-removed --reclassify --limit 30
+uv run save-finder classify --restore-removed --reclassify --limit 30
 
 # reconstrói o índice de busca (FTS5) a partir dos dados existentes
-.venv/bin/save-finder db reindex
+uv run save-finder db reindex
 
 # contagens por status e plataforma
-.venv/bin/save-finder stats
+uv run save-finder stats
 
 # valida a taxonomia
-.venv/bin/save-finder taxonomy validate
+uv run save-finder taxonomy validate
+
+# conecta a aplicação local à sua conta remota (login na API remota)
+uv run save-finder connect            # API padrão http://localhost:8080
+uv run save-finder connect --url http://localhost:8080
+# ou: SAVE_FINDER_API_URL=http://localhost:8080 uv run save-finder connect
 
 # apaga o conteúdo, preservando schema e taxonomia (pede confirmação)
-.venv/bin/save-finder db reset
+uv run save-finder db reset
 ```
+
+`connect` pede e-mail ou usuário e senha (a senha não é armazenada). Autentica
+na API remota (`apps/api`), verifica que a DEK da conta pode ser derivada e
+aberta localmente e salva a sessão em `data/credentials.json` (modo 0600,
+gitignored): cookie, `csrf_token`, expiração e URL da API. A senha e as chaves
+nunca tocam o disco. A API padrão é `http://localhost:8080`; sobrescreva com
+`--url` ou `SAVE_FINDER_API_URL`.
 
 `enrich` grava autor, caption, tipo do post, número de peças, duração e o caminho local da
 thumbnail. A imagem de capa vai para `data/thumbs/`; nenhuma URL de CDN é persistida.

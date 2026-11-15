@@ -66,3 +66,11 @@ class ClassifierError(SaveFinderError):
 
 class InvalidTagSelection(SaveFinderError):
     """A manual tag selection violates the closed taxonomy or parent rule."""
+
+
+class RemoteError(SaveFinderError):
+    """Communication with the remote API failed."""
+
+
+class RemoteAuthError(RemoteError):
+    """The remote API rejected the credentials or the key could not be unwrapped."""

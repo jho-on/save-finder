@@ -443,6 +443,34 @@ def taxonomy_validate() -> None:
     )
 
 
+@app.command("connect")
+def connect(
+    url: Annotated[
+        str,
+        typer.Option("--url", envvar="SAVE_FINDER_API_URL", help="Remote API URL."),
+    ] = "http://localhost:8080",
+) -> None:
+    """Connect this device to your remote account (pairing)."""
+    from save_finder import remote
+
+    identifier = typer.prompt("Email or username")
+    password = typer.prompt("Password", hide_input=True)
+    settings = _settings()
+    try:
+        account = remote.connect(url, identifier, password)
+    except SaveFinderError as exc:
+        console.print(f"[red]Could not connect:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    try:
+        path = remote.save_credentials(settings, account)
+    except SaveFinderError as exc:
+        console.print(f"[red]Could not save credentials:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    expiry = account.expires_at or "unknown"
+    console.print(f"Connected as [cyan]{account.email}[/cyan] (user: {account.username})")
+    console.print(f"Session expires at {expiry}; credentials saved to {path}")
+
+
 @app.command("serve")
 def serve(
     host: Annotated[str | None, typer.Option(help="Bind address.")] = None,
