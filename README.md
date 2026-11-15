@@ -49,6 +49,18 @@ make build          # verificações de build/importação de todas as aplicaç�
 make check          # lint/vet (Local: ruff; Go: go vet + gofmt)
 ```
 
+## CI e versionamento
+
+Workflows de CI independentes por componente em `.github/workflows/`
+(`local`, `api`, `web`), executados em PRs e pushes para `develop`/`main`
+com filtros de paths. Não há deploy nem publicação de artefatos nesta etapa.
+Versionamento em dois níveis (componente `<nome>/vX.Y.Z` e produto
+`save-finder/vX.Y.Z`), documentado em
+[`docs/development/versioning.md`](docs/development/versioning.md);
+compatibilidade entre componentes em
+[`docs/development/compatibility.md`](docs/development/compatibility.md);
+composição do produto em [`product.yaml`](product.yaml).
+
 Para o fluxo remoto (API + web) funcionar localmente:
 
 ```bash

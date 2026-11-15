@@ -1,0 +1,60 @@
+name: Local
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - apps/local/**
+      - Makefile
+      - .github/workflows/local.yml
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - apps/local/**
+      - Makefile
+      - .github/workflows/local.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/local
+
+jobs:
+  test:
+    name: lint and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.6"
+          enable-cache: true
+          cache-dependency-glob: apps/local/uv.lock
+
+      - name: install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: install Python 3.11
+        run: uv python install 3.11
+
+      - name: install dependencies (dev only, no AI extras)
+        run: uv sync --locked --extra dev
+
+      - name: ruff check
+        run: uv run ruff check .
+
+      - name: ruff format --check
+        run: uv run ruff format --check .
+
+      - name: pytest
+        run: uv run pytest

@@ -2,7 +2,7 @@
 
 Guia operacional para agentes de código que trabalharem neste repositório.
 Leia também [`docs/development/implementation-plan.md`](docs/development/implementation-plan.md) antes de implementar qualquer fase.
-O cronograma, as metas e o rumo futuro ficam em `docs/development/roadmap.local.md`, que não é versionado e pode não existir em outra máquina.
+O cronograma, as metas e o rumo futuro ficam em `docs/development/local/roadmap.local.md`, que não é versionado e pode não existir em outra máquina.
 
 ## Visão geral
 
@@ -77,10 +77,12 @@ clientes remotos e a API é por HTTP.
 ├── AGENTS.md
 ├── README.md
 ├── Makefile               # delega comandos para cada app
+├── product.yaml           # manifesto da composição do produto (save-finder/vX.Y.Z)
+├── .github/workflows/     # CI por componente (local, api, web)
 ├── docs/
 │   ├── architecture/      # overview, local, api, frontend, taxonomy
 │   ├── api/               # api.md (API JSON local)
-│   └── development/       # setup.md, implementation-plan.md, roadmap.local.md (gitignored)
+│   └── development/       # setup.md, implementation-plan.md; local/ (gitignored): notas pessoais
 ├── apps/
 │   ├── local/             # Python: aplicação existente (CLI + web local)
 │   ├── api/               # Go: API remota
@@ -277,8 +279,10 @@ Exemplos: `feat(platforms): add instagram export parser`, `fix(pipeline): remove
 
 ## Referências
 
+- Versionamento (dois níveis SemVer): [`docs/development/versioning.md`](docs/development/versioning.md)
+- Compatibilidade entre componentes: [`docs/development/compatibility.md`](docs/development/compatibility.md)
 - Plano detalhado: [`docs/development/implementation-plan.md`](docs/development/implementation-plan.md)
 - Decisões de arquitetura: [`docs/adr/README.md`](docs/adr/README.md)
 - Taxonomia inicial: [`docs/architecture/taxonomy.md`](docs/architecture/taxonomy.md)
-- Execução local (não versionada): `docs/development/roadmap.local.md`
+- Execução local (não versionada): `docs/development/local/roadmap.local.md`
 - Export do Instagram: Configurações → Central de Contas → Suas informações e permissões → Baixar suas informações → **Salvos** → JSON → todo o período.

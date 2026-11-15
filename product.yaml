@@ -1,0 +1,27 @@
+# Save-Finder — product composition manifest.
+#
+# This file records the tested, integrated composition of the product for a
+# given global release. It is the reference for what a `save-finder/vX.Y.Z`
+# tag means. It is NOT updated on every commit or individual deploy.
+#
+# Convention (see docs/development/versioning.md):
+#   product:        save-finder/vX.Y.Z  (global product SemVer)
+#   component tags: local/vX.Y.Z, api/vX.Y.Z, web/vX.Y.Z, mobile/vX.Y.Z
+#
+# `null` means the component has no version defined yet and is therefore not
+# part of any released composition. Do not invent versions for it; assign one
+# when the component is first tagged.
+#
+# The manifest changes only when a new product composition is formally
+# established (a save-finder/vX.Y.Z release). Updating it requires a PR and a
+# validated composition; it never happens automatically.
+
+product: save-finder
+version: 0.0.0
+status: unreleased
+
+components:
+  local: 0.1.0 # from apps/local/pyproject.toml ([project] version)
+  api: ~ # no version assigned yet
+  web: ~ # no version assigned yet
+  mobile: ~ # divergent: package.json 0.0.1 vs android/app/build.gradle versionName 1.0 — to be resolved before tagging

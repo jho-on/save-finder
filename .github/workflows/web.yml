@@ -1,0 +1,67 @@
+name: Web
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - apps/frontend/web/**
+      - Makefile
+      - .github/workflows/web.yml
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - apps/frontend/web/**
+      - Makefile
+      - .github/workflows/web.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/frontend/web
+
+jobs:
+  test:
+    name: generate, test, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/frontend/web/go.mod
+          cache-dependency-path: apps/frontend/web/go.sum
+
+      - name: templ generate
+        run: go run github.com/a-h/templ/cmd/templ generate
+
+      - name: generated code is in sync
+        run: |
+          if ! git diff --exit-code -- templates; then
+            echo "::error::templates/*_templ.go are out of sync with .templ files. Run 'make generate' and commit the result."
+            exit 1
+          fi
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Files not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./...
+
+      - name: build
+        run: go build -o /dev/null ./cmd/web
