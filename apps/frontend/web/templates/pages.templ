@@ -1,0 +1,95 @@
+package templates
+
+templ Login() {
+	@Layout("Entrar", "login", true) {
+		<p class="eyebrow">Acesso</p>
+		<h1>Entrar</h1>
+		<p class="lede">Use o e-mail ou usuário e sua senha. A mesma senha desbloqueia seus dados cifrados.</p>
+		@Feedback()
+		<form data-form="login" novalidate>
+			<div class="field">
+				<label for="identifier">E-mail ou usuário</label>
+				<input id="identifier" name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required/>
+			</div>
+			<div class="field">
+				<label for="password">Senha</label>
+				<input id="password" name="password" type="password" autocomplete="current-password" minlength="8" required/>
+			</div>
+			<div class="row">
+				<label class="checkbox"><input type="checkbox" name="remember_me"/> Lembrar de mim</label>
+			</div>
+			<button class="button" type="submit" data-submit>Entrar</button>
+		</form>
+		<p class="switch">Ainda não tem conta? <a href="/register">Criar conta</a></p>
+
+	}
+}
+
+templ Register() {
+	@Layout("Criar conta", "register", true) {
+		<p class="eyebrow">Cadastro</p>
+		<h1>Criar conta</h1>
+		<p class="lede">E-mail, usuário e senha. Ao criar a conta, geramos a chave que cifra seus dados neste navegador.</p>
+		@Feedback()
+		<form data-form="register" novalidate>
+			<div class="field">
+				<label for="email">E-mail</label>
+				<input id="email" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" required/>
+			</div>
+			<div class="field">
+				<label for="username">Usuário</label>
+				<input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="30" pattern="[a-z0-9._\-]+" required/>
+				<span class="hint">3–30 caracteres: a–z, 0–9, "_", "." ou "-"</span>
+			</div>
+			<div class="field">
+				<label for="password">Senha</label>
+				<input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required/>
+				<span class="hint">Mínimo de 8 caracteres, sem regras de composição.</span>
+			</div>
+			<div class="field">
+				<label for="password_confirmation">Confirmar senha</label>
+				<input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required/>
+			</div>
+			<button class="button" type="submit" data-submit>Criar conta</button>
+		</form>
+		<p class="switch">Já tem conta? <a href="/login">Entrar</a></p>
+	}
+}
+
+templ ChangePassword() {
+	@Layout("Trocar senha", "change-password", true) {
+		<p class="eyebrow">Conta</p>
+		<h1>Trocar senha</h1>
+		<p class="lede">A mesma senha protege sua conta e seus dados. Trocando-a, re-ciframos a chave DEK automaticamente — seus dados continuam legíveis.</p>
+		@Feedback()
+		<form data-form="change-password" novalidate>
+			<div class="field">
+				<label for="current_password">Senha atual</label>
+				<input id="current_password" name="current_password" type="password" autocomplete="current-password" required/>
+			</div>
+			<div class="field">
+				<label for="new_password">Nova senha</label>
+				<input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="8" required/>
+			</div>
+			<div class="field">
+				<label for="new_password_confirmation">Confirmar nova senha</label>
+				<input id="new_password_confirmation" name="new_password_confirmation" type="password" autocomplete="new-password" minlength="8" required/>
+			</div>
+			<button class="button" type="submit" data-submit>Salvar nova senha</button>
+		</form>
+		<p class="switch"><a href="/">Voltar</a></p>
+	}
+}
+
+templ Home(email, username string) {
+	@Layout("Início", "home", false) {
+		<p class="eyebrow">Conta</p>
+		<h1>Olá, { username }</h1>
+		<p class="lede">Sessão iniciada como <strong>{ email }</strong>. Em breve, seus arquivos cifrados aparecem aqui.</p>
+		@Feedback()
+		<form data-form="logout" class="logout-form">
+			<button class="button button-secondary" type="submit" data-submit>Sair</button>
+		</form>
+		<p class="switch"><a href="/change-password">Trocar senha</a></p>
+	}
+}

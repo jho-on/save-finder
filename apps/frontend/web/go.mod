@@ -2,7 +2,10 @@ module save-finder/web
 
 go 1.26.4
 
-require github.com/a-h/templ v0.3.1118
+require (
+	github.com/a-h/templ v0.3.1118
+	github.com/go-chi/chi/v5 v5.5.0
+)
 
 require (
 	github.com/a-h/parse v0.0.42 // indirect
