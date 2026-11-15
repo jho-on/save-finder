@@ -35,8 +35,10 @@ app = typer.Typer(
 )
 db_app = typer.Typer(help="Database commands.", no_args_is_help=True)
 taxonomy_app = typer.Typer(help="Taxonomy commands.", no_args_is_help=True)
+remote_app = typer.Typer(help="Remote API (E2EE) commands.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 app.add_typer(taxonomy_app, name="taxonomy")
+app.add_typer(remote_app, name="remote")
 
 console = Console()
 
@@ -469,6 +471,103 @@ def connect(
     expiry = account.expires_at or "unknown"
     console.print(f"Connected as [cyan]{account.email}[/cyan] (user: {account.username})")
     console.print(f"Session expires at {expiry}; credentials saved to {path}")
+
+
+@remote_app.command("push")
+def remote_push(
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Upload at most N items (for testing)."),
+    ] = None,
+) -> None:
+    """Encrypt the local library and upload it to the remote API (idempotent)."""
+    from rich.progress import Progress
+
+    from save_finder import remote_library
+
+    settings = _settings()
+    password = typer.prompt("Account password", hide_input=True)
+    with Progress(console=console, transient=True) as progress:
+        task = progress.add_task("Uploading items", total=None)
+
+        def _progress(done: int, total: int) -> None:
+            progress.update(task, completed=done, total=total)
+
+        try:
+            summary = remote_library.push_library(
+                settings, password=password, limit=limit, progress=_progress
+            )
+        except SaveFinderError as exc:
+            console.print(f"[red]Upload failed:[/red] {exc}")
+            raise typer.Exit(code=1) from exc
+    console.print(
+        f"Pushed [green]{summary.pushed}[/green] of {summary.total} items "
+        f"({summary.failed} failed, {summary.missing_thumbs} without thumbnail)."
+    )
+
+
+@remote_app.command("wipe")
+def remote_wipe() -> None:
+    """Delete every library item stored on the remote API (irreversible)."""
+    from save_finder import remote_library
+
+    settings = _settings()
+    console.print(
+        "[red]This permanently deletes the encrypted library stored remotely.[/red] "
+        "Local data is not affected."
+    )
+    if not typer.confirm("Delete everything remotely?"):
+        console.print("Aborted.")
+        raise typer.Exit(code=1)
+    password = typer.prompt("Account password", hide_input=True)
+    try:
+        deleted = remote_library.wipe_library(settings, password=password)
+    except SaveFinderError as exc:
+        console.print(f"[red]Wipe failed:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print(f"Deleted [green]{deleted}[/green] remote items.")
+
+
+@app.command("doctor")
+def doctor() -> None:
+    """Check whether the local AI providers are installed and reachable."""
+    from save_finder.providers.check import check_providers
+
+    settings = _settings()
+    statuses = check_providers(settings)
+
+    table = Table(title="SaveFinder — IAs locais")
+    table.add_column("Componente")
+    table.add_column("Status")
+    table.add_column("Detalhe", overflow="fold")
+    table.add_column("Como resolver", overflow="fold")
+
+    ok_count = 0
+    for status in statuses:
+        if status.ok:
+            ok_count += 1
+            label = "[green]ok[/green]" if status.status == "ok" else "[yellow]desativado[/yellow]"
+        else:
+            label = "[red]indisponível[/red]"
+        table.add_row(
+            status.label,
+            label,
+            status.detail,
+            status.hint or "-",
+        )
+
+    console.print(table)
+
+    if ok_count == len(statuses):
+        console.print("[green]Tudo pronto.[/green]")
+        return
+
+    console.print(
+        "[yellow]Faltam dependências.[/yellow] "
+        "Instale os extras de uma vez com [bold]make setup-ai[/bold] "
+        "(ou [bold]uv sync --all-extras[/bold])."
+    )
+    raise typer.Exit(code=1)
 
 
 @app.command("serve")
