@@ -28,13 +28,28 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 ```
 
-Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão:
+Opcional: dependências locais de IA ficam em extras separados e não são instaladas por padrão.
+O caminho mais fácil é o alvo de setup, que instala os extras e baixa o modelo do Ollama:
+
+```bash
+make setup-ai   # na raiz do monorepo ou em apps/local
+```
+
+Ou manualmente:
 
 ```bash
 uv sync --all-extras
 # ou, com venv e pip:
 .venv/bin/python -m pip install -e ".[dev,asr,vision,llm]"
 ```
+
+Para conferir se as IAs estão instaladas e acessíveis (e o que falta), rode:
+
+```bash
+save-finder doctor
+```
+
+O mesmo status aparece no painel de processamento (`/pipeline`), no cartão "IAs locais".
 
 O classificador usa três provedores locais, configurados em `config/settings.toml`:
 

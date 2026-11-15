@@ -1050,6 +1050,17 @@ def pipeline_stats(request: Request) -> dict[str, object]:
     }
 
 
+@router.get("/pipeline/providers")
+def pipeline_providers(request: Request) -> dict[str, object]:
+    from save_finder.providers.check import check_providers
+
+    statuses = check_providers(request.app.state.settings)
+    return {
+        "providers": [status.to_dict() for status in statuses],
+        "all_ok": all(status.ok for status in statuses),
+    }
+
+
 @router.get("/pipeline/{job_id}")
 def pipeline_status(request: Request, job_id: str) -> dict[str, object]:
     with session_scope(request.app.state.session_factory) as session:

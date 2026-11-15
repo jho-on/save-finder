@@ -476,6 +476,56 @@
 				}
 			}
 
+			.provider-list {
+				display: grid;
+				gap: 0.5rem;
+			}
+
+			.provider-row {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: baseline;
+				gap: 0.5rem 0.75rem;
+				font-size: 0.9rem;
+			}
+
+			.provider-badge {
+				font-size: 0.75rem;
+				font-weight: 700;
+				padding: 0.1rem 0.5rem;
+				border-radius: 999px;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+			}
+
+			.provider-badge.ok {
+				color: var(--color-success);
+				border: 1px solid var(--color-success);
+			}
+
+			.provider-badge.off {
+				color: var(--fg);
+				border: 1px solid var(--border);
+			}
+
+			.provider-badge.missing {
+				color: var(--color-danger);
+				border: 1px solid var(--color-danger);
+			}
+
+			.provider-hint {
+				width: 100%;
+				font-size: 0.8rem;
+				opacity: 0.85;
+				margin: 0;
+			}
+
+			.provider-hint code {
+				background: var(--color-surface-alt, rgba(127, 127, 127, 0.15));
+				padding: 0.05rem 0.35rem;
+				border-radius: 4px;
+			}
+
 			@media (max-width: 600px) {
 				.shell {
 					padding: 1.25rem 0.75rem;
@@ -533,6 +583,13 @@
 
 					<h3>Por operação</h3>
 					<div id="stats-ops"></div>
+				</div>
+
+				<div id="providers-panel" class="card">
+					<h2>IAs locais</h2>
+					<div id="providers-list" class="provider-list">
+						<p>Verificando...</p>
+					</div>
 				</div>
 
 				<div id="pipeline-monitor" class="card" hidden>
@@ -1033,8 +1090,56 @@
 
 			window.addEventListener("load", () => {
 				loadStats();
+				loadProviders();
 				resumeJobs();
 			});
+
+			function loadProviders() {
+				const container = document.getElementById("providers-list");
+				if (!container) return;
+
+				fetch("/api/pipeline/providers")
+					.then((response) => {
+						if (!response.ok) {
+							throw new Error("Falha ao verificar IAs");
+						}
+
+						return response.json();
+					})
+					.then((data) => {
+						const badge = (status) => {
+							if (status.status === "ok") {
+								return '<span class="provider-badge ok">Disponível</span>';
+							}
+
+							if (status.status === "disabled") {
+								return '<span class="provider-badge off">Desativada</span>';
+							}
+
+							return '<span class="provider-badge missing">Indisponível</span>';
+						};
+
+						container.innerHTML = (data.providers || [])
+							.map(
+								(status) => `
+                <div class="provider-row">
+                    <strong>${escapeHtml(status.label)}</strong>
+                    ${badge(status)}
+                    ${
+						status.hint
+							? `<p class="provider-hint">Para resolver: <code>${escapeHtml(status.hint)}</code></p>`
+							: ""
+					}
+                </div>
+            `,
+							)
+							.join("");
+					})
+					.catch(() => {
+						container.textContent =
+							"Não foi possível verificar as IAs locais.";
+					});
+			}
 
 			function loadStats() {
 				fetch("/api/pipeline/stats")
@@ -1102,7 +1207,6 @@
 				for (const [key, jobId] of Object.entries(jobs)) {
 					if (!JOB_OUTPUTS[key]) continue;
 
-					setJobUi(key, true, jobId);
 					pollJob(key, jobId);
 				}
 			}
@@ -1180,13 +1284,21 @@
 				const poll = () => {
 					fetch("/api/pipeline/" + encodeURIComponent(jobId))
 						.then((response) => {
+							if (response.status === 404) {
+								const error = new Error("Job não encontrado");
+								error.notFound = true;
+								throw error;
+							}
+
 							if (!response.ok) {
-								throw new Error("Job não encontrado");
+								throw new Error("Falha ao acompanhar job");
 							}
 
 							return response.json();
 						})
 						.then((data) => {
+							setJobUi(key, true, jobId);
+
 							if (key === "pipeline") {
 								renderPipeline(data);
 							} else if (output) {
@@ -1208,6 +1320,31 @@
 							setTimeout(poll, 1500);
 						})
 						.catch((error) => {
+							if (error.notFound) {
+								removeJob(key);
+								finishJobUi(key);
+
+								if (key === "pipeline") {
+									const monitor =
+										document.getElementById(
+											"pipeline-monitor",
+										);
+
+									if (monitor) monitor.hidden = true;
+								}
+
+								if (output) {
+									output.innerHTML = `
+                        <div class="job-message">
+                            Job anterior não encontrado; o botão foi restaurado.
+                        </div>
+                    `;
+								}
+
+								activePolls.delete(jobId);
+								return;
+							}
+
 							if (output) {
 								output.innerHTML = `
                         <div class="job-message failed">
