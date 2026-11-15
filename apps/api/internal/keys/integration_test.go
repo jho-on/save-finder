@@ -30,6 +30,10 @@ var testServer *httptest.Server
 func TestMain(m *testing.M) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
+		if os.Getenv("CI") == "true" {
+			fmt.Fprintln(os.Stderr, "TEST_DATABASE_URL not set in CI; refusing to skip integration tests")
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, "TEST_DATABASE_URL not set; skipping integration tests")
 		os.Exit(0)
 	}
