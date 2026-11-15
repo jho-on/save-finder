@@ -151,6 +151,23 @@ apps/local/
 A aplicação local vive em `apps/local` (os comandos abaixo assumem `cd apps/local`;
 na raiz, `make test-local`, `make check-local` etc. delegam para lá):
 
+Aplicação remota e web (os comandos assumem `cd apps/api` / `cd apps/frontend/web`;
+na raiz, `make test-api`, `make test-web` etc. delegam para lá):
+
+```bash
+cd apps/api
+cp .env.example .env            # uma vez; .env é local e gitignored
+make dev-db                     # Postgres descartável em localhost:55432
+make run                        # http://localhost:8080 (aplica migrations)
+make test                       # testes unitários
+make test-integration           # + testes contra o Postgres de dev
+
+cd apps/frontend/web
+make run                        # http://localhost:3000 (proxy /auth/* -> API)
+make test
+make generate                   # templ generate
+```
+
 ```bash
 cd apps/local
 
@@ -165,6 +182,7 @@ uv run save-finder download --limit 3   # download + análise em workspace tempo
 uv run save-finder classify --limit 30
 uv run save-finder serve                # http://127.0.0.1:8000
 uv run save-finder stats
+uv run save-finder connect               # pareia a CLI com a conta remota (--url / SAVE_FINDER_API_URL)
 
 uv run pytest -q
 uv run ruff check . && uv run ruff format --check .

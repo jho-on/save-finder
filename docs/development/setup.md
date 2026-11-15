@@ -28,14 +28,28 @@ e no [plano de implementação](implementation-plan.md).
 
 ## apps/api — Go
 
-Requisitos: Go 1.26+ (ver `go.mod`).
+Requisitos: Go 1.26+ (ver `go.mod`) e Postgres (Docker para dev).
+
+O binário **não** lê `.env` sozinho; `make run` e `make test-integration`
+carregam o arquivo com `set -a; . ./.env`. Configuração via `apps/api/.env`
+(gitignored; modelo em `.env.example`):
 
 ```bash
 cd apps/api
-go build ./...
-go test ./...
-go run ./cmd/api
+cp .env.example .env    # uma vez
+make dev-db             # Postgres descartável em localhost:55432 (volume savefinder-pgdata)
+make run                # http://localhost:8080 — aplica migrations e sobe
 ```
+
+- API: http://localhost:8080 (`/healthz`, `/readyz`, Swagger UI em `/swagger/`).
+- Testes: `make test` (unitários) · `make test-integration` (contra o Postgres
+  de dev; `TEST_DATABASE_URL` ou `DATABASE_URL`).
+- `make dev-db-stop` para o container · `make dev-db-reset` apaga container e volume.
+- Produção: Postgres instalado na máquina do host; basta apontar `DATABASE_URL`
+  no `.env` de produção (porta 5432). Nada de Docker em produção.
+- Migrations goose são aplicadas automaticamente no startup.
+
+Mais detalhes no [README da API](../../apps/api/README.md).
 
 ## apps/frontend/web — Go + Templ
 
@@ -43,12 +57,28 @@ Requisitos: Go 1.26+ (ver `go.mod`). A dependência do Templ está fixada em
 `tools.go`; o gerador pode ser executado via
 `go run github.com/a-h/templ/cmd/templ generate`.
 
+O web **não** fala direto com o banco: serve as páginas + estáticos e faz
+reverse proxy de `/auth/*` → a API remota (`API_UPSTREAM`, padrão
+`http://localhost:8080`). Sessão e CSRF fluem same-origin, sem CORS.
+
 ```bash
 cd apps/frontend/web
-go build ./...
-go test ./...
-go run ./cmd/web
+make run       # http://localhost:3000 (já com a API rodando em :8080)
+make test
 ```
+
+Variáveis: `PORT` (3000), `API_UPSTREAM` (http://localhost:8080), `LOG_FORMAT`.
+
+## Rodando tudo junto (dev)
+
+```bash
+cd apps/api && make dev-db && make run          # terminal 1 — API em :8080
+cd apps/frontend/web && make run                 # terminal 2 — web em :3000
+```
+
+Abra <http://localhost:3000>: tela de login/cadastro com a identidade Protea.
+Cadastro cria a conta + a DEK no navegador (E2EE); a senha de login também
+deriva a chave que cifra os dados sobretudo no cliente.
 
 ## apps/frontend/android — React Native + TypeScript
 

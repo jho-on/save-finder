@@ -46,7 +46,15 @@ make test-api       # testes da API (go test)
 make test-web       # testes do Web (go test)
 make test-android   # testes do Android (jest)
 make build          # verificações de build/importação de todas as aplicações
-make check          # lint/vet (Local: ruff; Go: go vet)
+make check          # lint/vet (Local: ruff; Go: go vet + gofmt)
+```
+
+Para o fluxo remoto (API + web) funcionar localmente:
+
+```bash
+cd apps/api && cp .env.example .env && make dev-db && make run   # API :8080
+cd apps/frontend/web && make run                                 # web :3000
+# abra http://localhost:3000 — cadastro + login com E2EE no navegador
 ```
 
 ## Documentação
@@ -54,6 +62,7 @@ make check          # lint/vet (Local: ruff; Go: go vet)
 - [`docs/architecture/overview.md`](docs/architecture/overview.md) — visão geral dos quatro produtos
 - [`docs/architecture/local.md`](docs/architecture/local.md) — SaveFinder Local
 - [`docs/architecture/api.md`](docs/architecture/api.md) — API remota
+- [`docs/adr/README.md`](docs/adr/README.md) — decisões de arquitetura (ADRs)
 - [`docs/architecture/frontend.md`](docs/architecture/frontend.md) — clientes remotos
 - [`docs/api/api.md`](docs/api/api.md) — referência da API JSON do Local
 - [`apps/local/README.md`](apps/local/README.md) — uso da aplicação local

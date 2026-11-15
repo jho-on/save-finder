@@ -67,6 +67,7 @@ export oficial → adapter → import → enrich → download temporário → an
 | D18 | Limiares com padrões iniciais, ajustados com o uso real | Permite codar sem congelar números no chute |
 | D19 | Importação aceita o ZIP oficial e upload por arrastar na web | É o formato real da exportação; evita descompactação manual e mantém curtidas e comentários fora |
 | D20 | Texto decide quando há fala/caption; visão entra quando não há texto ou o LLM não encontra categoria | Mantém as específicas no texto e usa o visual para o caso típico de imagem/carrossel; evita que um frame isolado sobreponha a fala |
+| D22 | CLI pareia com a conta via `save-finder connect` (login na API remota, unwrap da DEK no cliente); credenciais de sessão ficam em `data/credentials.json` (0600), senha e chaves nunca em disco | Base da integração futura de upload E2EE; justifica as dependências argon2-cffi e PyNaCl no Local |
 
 A preparação para multi-dispositivo se limita a: API JSON separada da UI, camada de dados portável e providers desacoplados. Acesso remoto e autenticação de usuário único entram quando o uso em celular justificar; nada de workspace ou multi-tenancy.
 

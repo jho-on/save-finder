@@ -39,6 +39,8 @@ check-local:
 
 check-api:
 	cd apps/api && go vet ./...
+	@test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
 
 check-web:
 	cd apps/frontend/web && go vet ./...
+	@test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
